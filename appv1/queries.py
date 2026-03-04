@@ -4,7 +4,7 @@ from typing import Literal
 
 from sqlalchemy import select, func, text, case
 
-from appv1.сonfig import settings
+from appv1.config import settings
 from appv1.models import User, Events, FarmaUser, FarmaEvent
 
 Service = Literal["rpp", "farma"]

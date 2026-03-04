@@ -2,7 +2,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse
 
 from appv1 import queries
-from appv1.сonfig import settings
+from appv1.config import settings
 from appv1.db_helper import db_helper
 from appv1.queries import Service, Period
 
