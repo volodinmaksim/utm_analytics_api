@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from sqlalchemy import select, func, text, case
+from sqlalchemy import select, func, text, case, Float
 
 from appv1.config import settings
 from appv1.models import User, Events, FarmaUser, FarmaEvent
@@ -87,9 +87,7 @@ def segments_rpp():
     )
 
     pct = func.round(
-        100.0
-        * func.count(User.id)
-        / func.nullif(func.cast(base_total, func.float), 0.0),
+        100.0 * func.count(User.id) / func.nullif(func.cast(base_total, Float), 0.0),
         2,
     ).label("pct")
 

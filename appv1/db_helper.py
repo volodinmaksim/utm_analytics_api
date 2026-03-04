@@ -14,7 +14,6 @@ class DataBaseHelper:
         self.engine = create_async_engine(
             url,
             pool_pre_ping=True,
-            query_cache_size=0,
         )
         self.session_factory = async_sessionmaker(
             bind=self.engine,
