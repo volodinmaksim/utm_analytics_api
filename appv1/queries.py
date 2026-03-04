@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from sqlalchemy import select, func, text, case, Float
+from sqlalchemy import select, func, text, case, Float, Numeric, cast
 
 from appv1.config import settings
 from appv1.models import User, Events, FarmaUser, FarmaEvent
@@ -86,10 +86,10 @@ def segments_rpp():
         .scalar_subquery()
     )
 
-    pct = func.round(
-        100.0 * func.count(User.id) / func.nullif(func.cast(base_total, Float), 0.0),
-        2,
-    ).label("pct")
+    denom = func.nullif(cast(base_total, Numeric), 0)
+    ratio = (cast(func.count(User.id), Numeric) * 100) / denom
+
+    pct = func.round(ratio, 2).label("pct")  # round(numeric, int) ✅
 
     return (
         select(User.segment.label("segment"), func.count().label("users"), pct)
