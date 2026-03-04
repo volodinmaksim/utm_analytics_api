@@ -11,7 +11,11 @@ from appv1.config import settings
 
 class DataBaseHelper:
     def __init__(self, url: str):
-        self.engine = create_async_engine(url, pool_pre_ping=True)
+        self.engine = create_async_engine(
+            url,
+            pool_pre_ping=True,
+            query_cache_size=0,
+        )
         self.session_factory = async_sessionmaker(
             bind=self.engine,
             autoflush=False,
