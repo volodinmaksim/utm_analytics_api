@@ -16,4 +16,4 @@ RUN poetry install --no-interaction --no-ansi --only main
 COPY . .
 
 EXPOSE 8000
-CMD ["python", "run.py"]
+RUN poetry install --no-interaction --no-ansi --only main -vvv
