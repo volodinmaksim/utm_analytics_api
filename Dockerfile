@@ -11,9 +11,11 @@ WORKDIR /app
 RUN pip install "poetry==$POETRY_VERSION"
 
 COPY pyproject.toml poetry.lock* ./
-RUN poetry install --no-interaction --no-ansi --only main
+
+# ВАЖНО: без --only main
+RUN poetry install --no-interaction --no-ansi
 
 COPY . .
 
 EXPOSE 8000
-RUN poetry install --no-interaction --no-ansi --only main -vvv
+CMD ["python", "run.py"]
