@@ -184,3 +184,23 @@ def file_clicks_timeseries(service: Service, period: Period):
         .group_by(text("period"))
         .order_by(text("period"))
     )
+
+
+def utm_marks(service: Service):
+    if service == "rpp":
+        col = User.utm_mark
+    else:
+        col = FarmaUser.utm_mark
+
+    normalized_utm = func.btrim(col).label("utm_mark")
+
+    return (
+        select(
+            normalized_utm,
+            func.count().label("users"),
+        )
+        .where(col.is_not(None))
+        .where(func.btrim(col) != "")
+        .group_by(normalized_utm)
+        .order_by(text("users DESC"), text("utm_mark ASC"))
+    )
