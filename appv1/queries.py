@@ -204,3 +204,20 @@ def utm_marks(service: Service):
         .group_by(normalized_utm)
         .order_by(text("users DESC"), text("utm_mark ASC"))
     )
+
+
+def branches_rpp():
+    branch = case(
+        (User.segment == "beginner", "beginner"),
+        (User.segment == "pro", "pro"),
+        else_="not_selected",
+    ).label("branch")
+
+    return (
+        select(
+            branch,
+            func.count(User.id).label("users"),
+        )
+        .group_by(branch)
+        .order_by(text("users DESC"), text("branch ASC"))
+    )
