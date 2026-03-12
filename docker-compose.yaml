@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: maksim
+      POSTGRES_PASSWORD: KJSDFSJDNFE3753fhSIUDF
+      POSTGRES_DB: tg_bots
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./datab/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U maksim -d tg_bots" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  analytics:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - analytics.env
+    ports:
+      - "8000:8000"

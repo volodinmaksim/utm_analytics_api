@@ -1,0 +1,500 @@
+﻿{% extends "base.html" %}
+
+{% block title %}UTM Analytics{% endblock %}
+
+{% block body %}
+<div class="max-w-7xl mx-auto p-6">
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+      <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Analytics</p>
+      <h1 class="text-3xl font-bold text-slate-900">UTM Analytics Dashboard</h1>
+      <p class="mt-2 text-sm text-slate-600">BASE_URL: <code>{{ base_url }}</code></p>
+    </div>
+
+    <div class="flex flex-col gap-2 sm:flex-row">
+      <select id="service" class="border rounded-xl px-3 py-2 bg-white">
+        <option value="rpp">RPP</option>
+        <option value="farma">Farma</option>
+      </select>
+
+      <select id="period" class="border rounded-xl px-3 py-2 bg-white">
+        <option value="day">day</option>
+        <option value="week">week</option>
+        <option value="month">month</option>
+      </select>
+
+      <button id="reload" class="rounded-xl px-4 py-2 bg-slate-900 text-white">
+        Обновить
+      </button>
+    </div>
+  </div>
+
+  <div id="error" class="hidden mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+
+  <section class="mt-8 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">Обзор</h2>
+        <p class="text-sm text-slate-500">Базовые показатели сервиса</p>
+      </div>
+      <p id="overview-status" class="text-sm text-slate-500">Ожидание загрузки</p>
+    </div>
+
+    <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <div class="text-sm text-slate-500">Всего пользователей</div>
+        <div id="total_users" class="mt-2 text-3xl font-bold">-</div>
+      </div>
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <div class="text-sm text-slate-500">Получили файл</div>
+        <div id="file_clicks" class="mt-2 text-3xl font-bold">-</div>
+      </div>
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <div class="text-sm text-slate-500">UTM c метками</div>
+        <div id="with_utm" class="mt-2 text-3xl font-bold">-</div>
+      </div>
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <div class="text-sm text-slate-500">UTM без меток</div>
+        <div id="without_utm" class="mt-2 text-3xl font-bold">-</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">Воронка</h2>
+        <p class="text-sm text-slate-500">Поэтапное движение пользователей</p>
+      </div>
+      <p id="funnel-status" class="text-sm text-slate-500">Ожидание загрузки</p>
+    </div>
+
+    <div class="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div class="overflow-x-auto rounded-2xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="p-3 text-left">Шаг</th>
+              <th class="p-3 text-left">Пользователи</th>
+              <th class="p-3 text-left">От старта</th>
+              <th class="p-3 text-left">От прошлого шага</th>
+            </tr>
+          </thead>
+          <tbody id="funnel-steps" class="divide-y"></tbody>
+        </table>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="p-3 text-left">Период</th>
+              <th class="p-3 text-left">Новые пользователи</th>
+            </tr>
+          </thead>
+          <tbody id="new-users" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="audience-section" class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">Аудитория RPP</h2>
+        <p class="text-sm text-slate-500">Распределение по сегментам и веткам</p>
+      </div>
+      <p id="audience-status" class="text-sm text-slate-500">Ожидание загрузки</p>
+    </div>
+
+    <div class="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div class="overflow-x-auto rounded-2xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="p-3 text-left">Сегмент</th>
+              <th class="p-3 text-left">Пользователи</th>
+              <th class="p-3 text-left">%</th>
+            </tr>
+          </thead>
+          <tbody id="segments" class="divide-y"></tbody>
+        </table>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="p-3 text-left">Ветка</th>
+              <th class="p-3 text-left">Пользователи</th>
+            </tr>
+          </thead>
+          <tbody id="branches" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">Контентные события</h2>
+        <p class="text-sm text-slate-500">Сколько пользователей дошло до конкретных контентных действий</p>
+      </div>
+      <p id="content-status" class="text-sm text-slate-500">Ожидание загрузки</p>
+    </div>
+
+    <div class="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-100 text-slate-700">
+          <tr>
+            <th class="p-3 text-left">Событие</th>
+            <th class="p-3 text-left">Пользователи</th>
+          </tr>
+        </thead>
+        <tbody id="content-items" class="divide-y"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">UTM</h2>
+        <p class="text-sm text-slate-500">Разрез по меткам и их динамика</p>
+      </div>
+      <p id="utm-status" class="text-sm text-slate-500">Ожидание загрузки</p>
+    </div>
+
+    <div class="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div class="overflow-x-auto rounded-2xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="p-3 text-left">UTM метка</th>
+              <th class="p-3 text-left">Пользователи</th>
+            </tr>
+          </thead>
+          <tbody id="utm-marks" class="divide-y"></tbody>
+        </table>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="p-3 text-left">Период</th>
+              <th class="p-3 text-left">С UTM</th>
+              <th class="p-3 text-left">Без UTM</th>
+            </tr>
+          </thead>
+          <tbody id="utm-timeseries" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">Feedback по постам</h2>
+        <p class="text-sm text-slate-500">Лайки и дизлайки по контенту</p>
+      </div>
+      <p id="feedback-status" class="text-sm text-slate-500">Ожидание загрузки</p>
+    </div>
+
+    <div class="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-100 text-slate-700">
+          <tr>
+            <th class="p-3 text-left">post_id</th>
+            <th class="p-3 text-left">likes</th>
+            <th class="p-3 text-left">dislikes</th>
+            <th class="p-3 text-left">rating</th>
+          </tr>
+        </thead>
+        <tbody id="feedback-items" class="divide-y"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">Пожелания пользователей</h2>
+        <p class="text-sm text-slate-500">Последние пользовательские сообщения</p>
+      </div>
+      <p id="wishes-status" class="text-sm text-slate-500">Ожидание загрузки</p>
+    </div>
+
+    <ul id="wishes-items" class="mt-5 space-y-3"></ul>
+  </section>
+</div>
+
+<script>
+const el = (id) => document.getElementById(id);
+let currentRequestId = 0;
+
+function fmt(value) {
+  if (value === null || value === undefined) return "-";
+  try {
+    return new Intl.NumberFormat("ru-RU").format(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function fmtPct(value) {
+  if (value === null || value === undefined) return "-";
+  return `${value}%`;
+}
+
+function fmtDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function fmtPeriod(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function setStatus(section, message, tone = "muted") {
+  const node = el(`${section}-status`);
+  if (!node) return;
+  const tones = {
+    muted: "text-slate-500",
+    loading: "text-amber-600",
+    success: "text-emerald-600",
+    error: "text-red-600",
+  };
+  node.className = `text-sm ${tones[tone] || tones.muted}`;
+  node.textContent = message;
+}
+
+function showError(message) {
+  const node = el("error");
+  node.textContent = message;
+  node.classList.remove("hidden");
+}
+
+function clearError() {
+  const node = el("error");
+  node.textContent = "";
+  node.classList.add("hidden");
+}
+
+function buildUrl(path, service, period) {
+  const params = new URLSearchParams({ service, period });
+  return `${path}?${params.toString()}`;
+}
+
+async function fetchSection(path, section, service, period, requestId) {
+  setStatus(section, "Загрузка...", "loading");
+  const response = await fetch(buildUrl(path, service, period));
+  if (requestId !== currentRequestId) {
+    throw new Error("stale-request");
+  }
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`${response.status}: ${body}`);
+  }
+  setStatus(section, "Загружено", "success");
+  return response.json();
+}
+
+function resetTables() {
+  el("funnel-steps").innerHTML = "";
+  el("new-users").innerHTML = "";
+  el("segments").innerHTML = "";
+  el("branches").innerHTML = "";
+  el("content-items").innerHTML = "";
+  el("utm-marks").innerHTML = "";
+  el("utm-timeseries").innerHTML = "";
+  el("feedback-items").innerHTML = "";
+  el("wishes-items").innerHTML = "";
+  el("total_users").textContent = "-";
+  el("file_clicks").textContent = "-";
+  el("with_utm").textContent = "-";
+  el("without_utm").textContent = "-";
+  el("audience-section").classList.remove("hidden");
+
+  for (const section of ["overview", "funnel", "audience", "content", "utm", "feedback", "wishes"]) {
+    setStatus(section, "Ожидание загрузки");
+  }
+}
+
+async function loadOverview(service, period, requestId) {
+  const data = await fetchSection("/api/analytics/overview", "overview", service, period, requestId);
+  el("total_users").textContent = fmt(data.total_users);
+  el("file_clicks").textContent = fmt(data.file_clicks);
+  el("with_utm").textContent = fmt(data.with_utm);
+  el("without_utm").textContent = fmt(data.without_utm);
+}
+
+async function loadFunnel(service, period, requestId) {
+  const data = await fetchSection("/api/analytics/funnel", "funnel", service, period, requestId);
+  for (const item of data.steps || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(item.label)}</td>
+      <td class="p-3">${fmt(item.users)}</td>
+      <td class="p-3">${fmtPct(item.conversion_from_start)}</td>
+      <td class="p-3">${fmtPct(item.conversion_from_previous)}</td>
+    `;
+    el("funnel-steps").appendChild(tr);
+  }
+
+  for (const item of data.new_users || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(fmtPeriod(item.period))}</td>
+      <td class="p-3">${fmt(item.new_users)}</td>
+    `;
+    el("new-users").appendChild(tr);
+  }
+}
+
+async function loadAudience(service, period, requestId) {
+  if (service !== "rpp") {
+    el("audience-section").classList.add("hidden");
+    setStatus("audience", "Недоступно для Farma");
+    return;
+  }
+
+  const data = await fetchSection("/api/analytics/audience", "audience", service, period, requestId);
+  for (const item of data.segments || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(item.name)}</td>
+      <td class="p-3">${fmt(item.users)}</td>
+      <td class="p-3">${fmtPct(item.pct)}</td>
+    `;
+    el("segments").appendChild(tr);
+  }
+
+  for (const item of data.branches || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(item.name)}</td>
+      <td class="p-3">${fmt(item.users)}</td>
+    `;
+    el("branches").appendChild(tr);
+  }
+}
+
+async function loadContent(service, period, requestId) {
+  const data = await fetchSection("/api/analytics/content", "content", service, period, requestId);
+  for (const item of data.items || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(item.label)}</td>
+      <td class="p-3">${fmt(item.users)}</td>
+    `;
+    el("content-items").appendChild(tr);
+  }
+}
+
+async function loadUtm(service, period, requestId) {
+  const data = await fetchSection("/api/analytics/utm", "utm", service, period, requestId);
+  for (const item of data.marks || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(item.utm_mark)}</td>
+      <td class="p-3">${fmt(item.users)}</td>
+    `;
+    el("utm-marks").appendChild(tr);
+  }
+
+  for (const item of data.timeseries || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(fmtPeriod(item.period))}</td>
+      <td class="p-3">${fmt(item.with_utm)}</td>
+      <td class="p-3">${fmt(item.without_utm)}</td>
+    `;
+    el("utm-timeseries").appendChild(tr);
+  }
+}
+
+async function loadFeedback(service, period, requestId) {
+  const data = await fetchSection("/api/analytics/feedback", "feedback", service, period, requestId);
+  for (const item of data.items || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(item.post_id)}</td>
+      <td class="p-3">${fmt(item.likes)}</td>
+      <td class="p-3">${fmt(item.dislikes)}</td>
+      <td class="p-3 font-semibold">${fmt(item.rating)}</td>
+    `;
+    el("feedback-items").appendChild(tr);
+  }
+}
+
+async function loadWishes(service, period, requestId) {
+  const data = await fetchSection("/api/analytics/wishes", "wishes", service, period, requestId);
+  for (const item of data.items || []) {
+    const li = document.createElement("li");
+    li.className = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3";
+    li.innerHTML = `
+      <div class="text-xs text-slate-500">${escapeHtml(fmtDate(item.timestamp))}</div>
+      <div class="mt-1 text-sm text-slate-900">${escapeHtml(item.wish_text)}</div>
+    `;
+    el("wishes-items").appendChild(li);
+  }
+}
+
+async function loadDashboard() {
+  currentRequestId += 1;
+  const requestId = currentRequestId;
+  clearError();
+  resetTables();
+
+  const service = el("service").value;
+  const period = el("period").value;
+  const loaders = [
+    loadOverview,
+    loadFunnel,
+    loadAudience,
+    loadContent,
+    loadUtm,
+    loadFeedback,
+    loadWishes,
+  ];
+
+  for (const loader of loaders) {
+    try {
+      await loader(service, period, requestId);
+    } catch (error) {
+      if (String(error.message || error) === "stale-request") {
+        return;
+      }
+      const sectionName = loader.name.replace("load", "").toLowerCase();
+      setStatus(sectionName, "Ошибка загрузки", "error");
+      showError(`Секция ${sectionName}: ${error.message || error}`);
+    }
+  }
+}
+
+el("reload").addEventListener("click", loadDashboard);
+loadDashboard();
+</script>
+{% endblock %}
