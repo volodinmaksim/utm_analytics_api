@@ -2,7 +2,7 @@
 *.env
 
 /.idea/*
-*/__pycache__/*
-docker-compose.yaml
-
+**/__pycache__/
 datab/*
+
+skills/

@@ -9,3 +9,5 @@ __pycache__/
 .env
 analytics.env
 data/
+docker-compose.yaml
+skills/
