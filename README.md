@@ -1,1 +1,1 @@
-make postgres password
+make postgres password in docker compose
