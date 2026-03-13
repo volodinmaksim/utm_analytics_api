@@ -1,6 +1,6 @@
-from datetime import datetime
+﻿from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -43,12 +43,12 @@ class User(Base):
 
     tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     username: Mapped[str] = mapped_column(String(100))
-    segment: Mapped[str] = mapped_column(String(15), nullable=True)
+    segment: Mapped[str | None] = mapped_column(String(15), nullable=True)
     join_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
-    utm_mark: Mapped[str] = mapped_column(String(100), nullable=True)
+    utm_mark: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     events: Mapped[list["Events"]] = relationship(
         back_populates="user",
@@ -58,12 +58,18 @@ class User(Base):
 
 class Events(Base):
     __tablename__ = "events"
+    __table_args__ = (Index("ix_events_user_id_timestamp", "user_id", "timestamp"),)
 
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    event_name: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    event_name: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     timestamp: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
+        index=True,
     )
 
     user: Mapped["User"] = relationship(back_populates="events")
