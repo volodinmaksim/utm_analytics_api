@@ -1,10 +1,12 @@
-﻿from pathlib import Path
+from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from analytics_app.app.db import settings
+from analytics_app.app.db import get_session, settings
 from analytics_app.app.models.dto import (
     AudienceResponse,
     ContentResponse,
@@ -31,6 +33,7 @@ router = APIRouter()
 templates = Jinja2Templates(
     directory=str(Path(__file__).resolve().parents[1] / "templates")
 )
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -44,55 +47,62 @@ async def dashboard(request: Request) -> HTMLResponse:
 
 @router.get("/api/analytics/overview", response_model=OverviewResponse)
 async def overview(
+    session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> OverviewResponse:
-    return await get_overview(service=service, period=period)
+    return await get_overview(session=session, service=service, period=period)
 
 
 @router.get("/api/analytics/funnel", response_model=FunnelResponse)
 async def funnel(
+    session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> FunnelResponse:
-    return await get_funnel(service=service, period=period)
+    return await get_funnel(session=session, service=service, period=period)
 
 
 @router.get("/api/analytics/audience", response_model=AudienceResponse)
 async def audience(
+    session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> AudienceResponse:
-    return await get_audience(service=service, period=period)
+    return await get_audience(session=session, service=service, period=period)
 
 
 @router.get("/api/analytics/content", response_model=ContentResponse)
 async def content(
+    session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> ContentResponse:
-    return await get_content(service=service, period=period)
+    return await get_content(session=session, service=service, period=period)
 
 
 @router.get("/api/analytics/utm", response_model=UTMResponse)
 async def utm(
+    session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> UTMResponse:
-    return await get_utm(service=service, period=period)
+    return await get_utm(session=session, service=service, period=period)
 
 
 @router.get("/api/analytics/feedback", response_model=FeedbackResponse)
 async def feedback(
+    session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> FeedbackResponse:
-    return await get_feedback(service=service, period=period)
+    return await get_feedback(session=session, service=service, period=period)
 
 
 @router.get("/api/analytics/wishes", response_model=WishesResponse)
 async def wishes(
+    session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> WishesResponse:
-    return await get_wishes(service=service, period=period)
+    return await get_wishes(session=session, service=service, period=period)

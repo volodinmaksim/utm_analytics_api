@@ -1,9 +1,10 @@
-﻿from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, Awaitable, Callable, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from analytics_app.app.db import get_scoped_session, settings
+from analytics_app.app.db import settings
 from analytics_app.app.models.dto import (
     AudienceResponse,
     AudienceRow,
@@ -26,20 +27,17 @@ from analytics_app.app.models.dto import (
 from analytics_app.app.services import queries
 from analytics_app.app.services.cache import TTLCache
 
-
 R = TypeVar("R", bound=BaseModel)
 
 RPP_FUNNEL_EVENTS = (
-    ("file_received", 'Получить файл: "Пакет инструментов для работы с РПП от Ирины Ушаковой"'),
+    ("file_received", settings.RPP_FILE_EVENT),
     ("survey_15min_sent", "survey_15min_sent"),
     ("continue_yes", "extra_yes"),
     ("reviews_opened", "reviews_opened"),
     ("wish_submitted", "wish_submitted"),
 )
 
-FARMA_FUNNEL_EVENTS = (
-    ("file_received", 'Получить файл: "Гайд по серотониновому синдрому"'),
-)
+FARMA_FUNNEL_EVENTS = (("file_received", settings.FARMA_FILE_EVENT),)
 
 FUNNEL_LABELS = {
     "registered": "Пользователи в базе",
@@ -90,13 +88,13 @@ SECTION_TTLS = {
 cache = TTLCache(ttl_seconds=settings.CACHE_TTL)
 
 
-async def _exec_one(session, stmt) -> dict[str, Any]:
+async def _exec_one(session: AsyncSession, stmt) -> dict[str, Any]:
     result = await session.execute(stmt)
     row = result.mappings().first()
     return dict(row) if row else {}
 
 
-async def _exec_all(session, stmt) -> list[dict[str, Any]]:
+async def _exec_all(session: AsyncSession, stmt) -> list[dict[str, Any]]:
     result = await session.execute(stmt)
     return [dict(row) for row in result.mappings().all()]
 
@@ -113,14 +111,15 @@ def _pct(numerator: int, denominator: int) -> float | None:
 
 def _is_missing_table_error(exc: ProgrammingError) -> bool:
     message = str(exc)
-    return "UndefinedTableError" in message or 'does not exist' in message
+    return "UndefinedTableError" in message or "does not exist" in message
 
 
 async def _cached_section(
     section: str,
     service: Service,
     period: Period,
-    loader: Callable[[Any], Awaitable[R]],
+    session: AsyncSession,
+    loader: Callable[[AsyncSession], Awaitable[R]],
     model: type[R],
     fallback: Callable[[], R] | None = None,
 ) -> R:
@@ -129,8 +128,6 @@ async def _cached_section(
     if cached is not None:
         return model.model_validate(cached)
 
-    scoped_session = get_scoped_session()
-    session = scoped_session()
     try:
         payload = await loader(session)
     except ProgrammingError as exc:
@@ -138,20 +135,17 @@ async def _cached_section(
             payload = fallback()
         else:
             raise
-    finally:
-        await session.close()
-        await scoped_session.remove()
 
     cache.set(
-        key,
-        payload.model_dump(mode="json"),
-        ttl_seconds=SECTION_TTLS.get(section),
+        key, payload.model_dump(mode="json"), ttl_seconds=SECTION_TTLS.get(section)
     )
     return payload
 
 
-async def get_overview(service: Service, period: Period) -> OverviewResponse:
-    async def loader(session) -> OverviewResponse:
+async def get_overview(
+    session: AsyncSession, service: Service, period: Period
+) -> OverviewResponse:
+    async def loader(session: AsyncSession) -> OverviewResponse:
         total_users = await _exec_one(session, queries.total_users(service))
         utm_split = await _exec_one(session, queries.utm_split(service))
         file_clicks = await _exec_one(session, queries.file_clicks(service))
@@ -168,6 +162,7 @@ async def get_overview(service: Service, period: Period) -> OverviewResponse:
         "overview",
         service,
         period,
+        session,
         loader,
         OverviewResponse,
         fallback=lambda: OverviewResponse(
@@ -181,17 +176,25 @@ async def get_overview(service: Service, period: Period) -> OverviewResponse:
     )
 
 
-async def get_funnel(service: Service, period: Period) -> FunnelResponse:
-    async def loader(session) -> FunnelResponse:
+async def get_funnel(
+    session: AsyncSession, service: Service, period: Period
+) -> FunnelResponse:
+    async def loader(session: AsyncSession) -> FunnelResponse:
         total_users = await _exec_one(session, queries.total_users(service))
         new_users = await _exec_all(session, queries.new_users(service, period))
 
-        step_definitions = RPP_FUNNEL_EVENTS if service == Service.RPP else FARMA_FUNNEL_EVENTS
+        step_definitions = (
+            RPP_FUNNEL_EVENTS if service == Service.RPP else FARMA_FUNNEL_EVENTS
+        )
         event_counts = await _exec_all(
             session,
-            queries.event_user_counts(service, tuple(event for _, event in step_definitions)),
+            queries.event_user_counts(
+                service, tuple(event for _, event in step_definitions)
+            ),
         )
-        event_map = {row["event_name"]: int(row.get("users", 0) or 0) for row in event_counts}
+        event_map = {
+            row["event_name"]: int(row.get("users", 0) or 0) for row in event_counts
+        }
 
         steps: list[FunnelStepRow] = []
         start_users = int(total_users.get("total_users", 0) or 0)
@@ -230,14 +233,19 @@ async def get_funnel(service: Service, period: Period) -> FunnelResponse:
         "funnel",
         service,
         period,
+        session,
         loader,
         FunnelResponse,
-        fallback=lambda: FunnelResponse(service=service, period=period, new_users=[], steps=[]),
+        fallback=lambda: FunnelResponse(
+            service=service, period=period, new_users=[], steps=[]
+        ),
     )
 
 
-async def get_audience(service: Service, period: Period) -> AudienceResponse:
-    async def loader(session) -> AudienceResponse:
+async def get_audience(
+    session: AsyncSession, service: Service, period: Period
+) -> AudienceResponse:
+    async def loader(session: AsyncSession) -> AudienceResponse:
         if service != Service.RPP:
             return AudienceResponse(service=service, segments=[], branches=[])
 
@@ -263,11 +271,15 @@ async def get_audience(service: Service, period: Period) -> AudienceResponse:
             ],
         )
 
-    return await _cached_section("audience", service, period, loader, AudienceResponse)
+    return await _cached_section(
+        "audience", service, period, session, loader, AudienceResponse
+    )
 
 
-async def get_content(service: Service, period: Period) -> ContentResponse:
-    async def loader(session) -> ContentResponse:
+async def get_content(
+    session: AsyncSession, service: Service, period: Period
+) -> ContentResponse:
+    async def loader(session: AsyncSession) -> ContentResponse:
         rows = await _exec_all(
             session,
             queries.event_user_counts(service, tuple(CONTENT_EVENT_LABELS.keys())),
@@ -284,14 +296,17 @@ async def get_content(service: Service, period: Period) -> ContentResponse:
         "content",
         service,
         period,
+        session,
         loader,
         ContentResponse,
         fallback=lambda: ContentResponse(service=service, items=[]),
     )
 
 
-async def get_utm(service: Service, period: Period) -> UTMResponse:
-    async def loader(session) -> UTMResponse:
+async def get_utm(
+    session: AsyncSession, service: Service, period: Period
+) -> UTMResponse:
+    async def loader(session: AsyncSession) -> UTMResponse:
         marks = await _exec_all(session, queries.utm_marks(service))
         timeseries = await _exec_all(session, queries.utm_timeseries(service, period))
         return UTMResponse(
@@ -311,14 +326,19 @@ async def get_utm(service: Service, period: Period) -> UTMResponse:
         "utm",
         service,
         period,
+        session,
         loader,
         UTMResponse,
-        fallback=lambda: UTMResponse(service=service, period=period, marks=[], timeseries=[]),
+        fallback=lambda: UTMResponse(
+            service=service, period=period, marks=[], timeseries=[]
+        ),
     )
 
 
-async def get_feedback(service: Service, period: Period) -> FeedbackResponse:
-    async def loader(session) -> FeedbackResponse:
+async def get_feedback(
+    session: AsyncSession, service: Service, period: Period
+) -> FeedbackResponse:
+    async def loader(session: AsyncSession) -> FeedbackResponse:
         items = await _exec_all(session, queries.post_reactions(service))
         return FeedbackResponse(
             service=service,
@@ -337,14 +357,17 @@ async def get_feedback(service: Service, period: Period) -> FeedbackResponse:
         "feedback",
         service,
         period,
+        session,
         loader,
         FeedbackResponse,
         fallback=lambda: FeedbackResponse(service=service, items=[]),
     )
 
 
-async def get_wishes(service: Service, period: Period) -> WishesResponse:
-    async def loader(session) -> WishesResponse:
+async def get_wishes(
+    session: AsyncSession, service: Service, period: Period
+) -> WishesResponse:
+    async def loader(session: AsyncSession) -> WishesResponse:
         items = await _exec_all(session, queries.wishes(service))
         return WishesResponse(
             service=service,
@@ -355,6 +378,7 @@ async def get_wishes(service: Service, period: Period) -> WishesResponse:
         "wishes",
         service,
         period,
+        session,
         loader,
         WishesResponse,
         fallback=lambda: WishesResponse(service=service, items=[]),

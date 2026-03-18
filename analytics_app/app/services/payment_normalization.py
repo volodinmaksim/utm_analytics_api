@@ -33,7 +33,17 @@ class PaymentRowStatus(str, Enum):
 
 
 @dataclass(slots=True, frozen=True)
-class NormalizedPaymentEvent:
+class SheetSourceContext:
+    tracked_sheet_id: int
+    service: ServiceType
+    spreadsheet_id: str
+    sheet_name: str
+    sheet_gid: int | None = None
+
+
+@dataclass(slots=True)
+class PaymentEventPayload:
+    tracked_sheet_id: int
     service: ServiceType
     source_sheet_name: str
     source_row_num: int
@@ -46,70 +56,27 @@ class NormalizedPaymentEvent:
     event_type: PaymentEventType
     amount: Decimal | None
     raw_payment_value: str
+    user_id: int | None = None
+    farma_user_id: int | None = None
+    matched_user_tg_id: int | None = None
 
-
-@dataclass(slots=True, frozen=True)
-class PaymentRowNormalizationResult:
-    status: PaymentRowStatus
-    row_num: int
-    event: NormalizedPaymentEvent | None = None
-    reason: str | None = None
-
-    @property
-    def is_valid(self) -> bool:
-        return self.status == PaymentRowStatus.NORMALIZED and self.event is not None
-
-
-def normalize_payment_row(
-    *,
-    row: GoogleSheetRow,
-    service: ServiceType,
-    spreadsheet_id: str,
-    sheet_name: str,
-    sheet_gid: int | None = None,
-) -> PaymentRowNormalizationResult:
-    if row.is_empty:
-        return PaymentRowNormalizationResult(
-            status=PaymentRowStatus.EMPTY,
-            row_num=row.source_row_num,
-            reason="empty_row",
-        )
-
-    raw_payment_value = (row.raw_payment_value or "").strip()
-    if not raw_payment_value:
-        return PaymentRowNormalizationResult(
-            status=PaymentRowStatus.INVALID,
-            row_num=row.source_row_num,
-            reason="missing_raw_payment_value",
-        )
-
-    event_type, amount = _classify_payment_value(raw_payment_value)
-    if event_type is None:
-        return PaymentRowNormalizationResult(
-            status=PaymentRowStatus.INVALID,
-            row_num=row.source_row_num,
-            reason="unsupported_payment_value",
-        )
-
-    event_date = _parse_event_date(row.event_date_raw)
-    platform_id = _parse_platform_id(row.platform_id_raw)
-    fingerprint = build_payment_source_fingerprint(
-        spreadsheet_id=spreadsheet_id,
-        sheet_name=sheet_name,
-        sheet_gid=sheet_gid,
-        source_row_num=row.source_row_num,
-        platform_id=platform_id,
-        raw_payment_value=raw_payment_value,
-        event_date=event_date,
-        event_date_raw=row.event_date_raw,
-    )
-
-    return PaymentRowNormalizationResult(
-        status=PaymentRowStatus.NORMALIZED,
-        row_num=row.source_row_num,
-        event=NormalizedPaymentEvent(
-            service=service,
-            source_sheet_name=sheet_name,
+    @classmethod
+    def from_sheet_row(
+        cls,
+        row: GoogleSheetRow,
+        context: SheetSourceContext,
+        *,
+        fingerprint: str,
+        platform_id: int | None,
+        event_date: datetime | None,
+        event_type: PaymentEventType,
+        amount: Decimal | None,
+        raw_payment_value: str,
+    ) -> "PaymentEventPayload":
+        return cls(
+            tracked_sheet_id=context.tracked_sheet_id,
+            service=context.service,
+            source_sheet_name=context.sheet_name,
             source_row_num=row.source_row_num,
             source_fingerprint=fingerprint,
             platform_id=platform_id,
@@ -120,41 +87,98 @@ def normalize_payment_row(
             event_type=event_type,
             amount=amount,
             raw_payment_value=raw_payment_value,
+        )
+
+
+@dataclass(slots=True, frozen=True)
+class PaymentRowResult:
+    status: PaymentRowStatus
+    row_num: int
+    payload: PaymentEventPayload | None = None
+    reason: str | None = None
+
+    @property
+    def is_valid(self) -> bool:
+        return self.payload is not None
+
+
+def normalize_payment_row(row: GoogleSheetRow, context: SheetSourceContext) -> PaymentRowResult:
+    if row.is_empty:
+        return PaymentRowResult(
+            status=PaymentRowStatus.EMPTY,
+            row_num=row.source_row_num,
+            reason="empty_row",
+        )
+
+    raw_payment_value = _clean_text(row.raw_payment_value)
+    if raw_payment_value is None:
+        return PaymentRowResult(
+            status=PaymentRowStatus.INVALID,
+            row_num=row.source_row_num,
+            reason="missing_raw_payment_value",
+        )
+
+    event_type, amount = _classify_payment_value(raw_payment_value)
+    if event_type is None:
+        return PaymentRowResult(
+            status=PaymentRowStatus.INVALID,
+            row_num=row.source_row_num,
+            reason="unsupported_payment_value",
+        )
+
+    platform_id = _parse_platform_id(row.platform_id_raw)
+    event_date = _parse_event_date(row.event_date_raw)
+    fingerprint = _build_source_fingerprint(
+        context=context,
+        row_num=row.source_row_num,
+        platform_id=platform_id,
+        raw_payment_value=raw_payment_value,
+        event_date=event_date,
+        event_date_raw=row.event_date_raw,
+    )
+
+    return PaymentRowResult(
+        status=PaymentRowStatus.NORMALIZED,
+        row_num=row.source_row_num,
+        payload=PaymentEventPayload.from_sheet_row(
+            row,
+            context,
+            fingerprint=fingerprint,
+            platform_id=platform_id,
+            event_date=event_date,
+            event_type=event_type,
+            amount=amount,
+            raw_payment_value=raw_payment_value,
         ),
     )
 
 
-def build_payment_source_fingerprint(
+def _build_source_fingerprint(
     *,
-    spreadsheet_id: str,
-    sheet_name: str,
-    sheet_gid: int | None,
-    source_row_num: int,
+    context: SheetSourceContext,
+    row_num: int,
     platform_id: int | None,
     raw_payment_value: str,
     event_date: datetime | None,
     event_date_raw: str | None,
 ) -> str:
-    source_sheet_key = str(sheet_gid) if sheet_gid is not None else sheet_name
+    source_sheet_key = str(context.sheet_gid) if context.sheet_gid is not None else context.sheet_name
     event_date_part = event_date.isoformat() if event_date is not None else (event_date_raw or "")
-    fingerprint_source = "|".join(
+    raw = "|".join(
         (
-            spreadsheet_id.strip(),
+            context.spreadsheet_id.strip(),
             source_sheet_key.strip(),
-            str(source_row_num),
+            str(row_num),
             "" if platform_id is None else str(platform_id),
             raw_payment_value.strip().lower(),
             event_date_part.strip(),
         )
     )
-    return hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _classify_payment_value(
-    raw_payment_value: str,
-) -> tuple[PaymentEventType | None, Decimal | None]:
-    normalized_value = raw_payment_value.strip().lower()
-    if normalized_value == "oplata":
+def _classify_payment_value(raw_payment_value: str) -> tuple[PaymentEventType | None, Decimal | None]:
+    if raw_payment_value.strip().lower() == "oplata":
         return PaymentEventType.PAYMENT_CLICK, None
 
     amount = _parse_amount(raw_payment_value)
@@ -164,7 +188,7 @@ def _classify_payment_value(
 
 
 def _parse_amount(raw_payment_value: str) -> Decimal | None:
-    normalized = raw_payment_value.strip().replace(" ", " ")
+    normalized = raw_payment_value.strip().replace("\xa0", " ")
     normalized = _AMOUNT_SUFFIX_RE.sub("", normalized)
     normalized = normalized.replace(" ", "")
 
