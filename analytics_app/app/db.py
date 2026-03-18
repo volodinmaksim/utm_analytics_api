@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: str | None = None
     GOOGLE_SHEETS_SCOPES: str = "https://www.googleapis.com/auth/spreadsheets.readonly"
     PAYMENTS_SYNC_OVERLAP_ROWS: int = 50
+    PAYMENTS_SOURCE_TIMEZONE: str = "UTC"
     WISH_PREFIXES: str = "user_wish:"
     POSTS_LIMIT: int = 200
     WISHES_LIMIT: int = 200
