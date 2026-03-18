@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analytics_app.app.models.orm import FarmaUser, ServiceType, User
-from analytics_app.app.services.payment_normalization import PaymentEventPayload
+from analytics_app.app.payments.normalization import PaymentEventPayload
 
 
 async def match_payment_event(

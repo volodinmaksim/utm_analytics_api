@@ -1,4 +1,4 @@
-from analytics_app.app.integrations.google_sheets import (
+from analytics_app.app.clients.google_sheets import (
     GoogleSheetRow,
     GoogleSheetsClient,
     GoogleSheetsConfigurationError,

@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 
-from analytics_app.app.integrations.google_sheets import get_google_sheets_client
+from analytics_app.app.clients.google_sheets import get_google_sheets_client
 
 
 async def _main() -> None:
