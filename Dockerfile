@@ -10,7 +10,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ВАЖНО: НЕ фиксируем 1.8.3, ставим актуальный Poetry (скорее всего 2.x)
 RUN pip install --no-cache-dir poetry
 
 COPY pyproject.toml poetry.lock ./

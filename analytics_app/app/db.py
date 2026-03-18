@@ -1,4 +1,4 @@
-﻿from asyncio import current_task
+from asyncio import current_task
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import (
@@ -15,14 +15,18 @@ class Settings(BaseSettings):
     HOST: str
     PORT: int
     BASE_URL: str
+    GOOGLE_SHEETS_SERVICE_ACCOUNT_FILE: str | None = None
+    GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: str | None = None
+    GOOGLE_SHEETS_SCOPES: str = "https://www.googleapis.com/auth/spreadsheets.readonly"
+    PAYMENTS_SYNC_OVERLAP_ROWS: int = 50
     WISH_PREFIXES: str = "user_wish:"
     POSTS_LIMIT: int = 200
     WISHES_LIMIT: int = 200
     CACHE_TTL: int = 60
     RPP_FILE_EVENT: str = (
-        'Получить файл: "Пакет инструментов для работы с РПП от Ирины Ушаковой"'
+        '???????? ????: "????? ???????????? ??? ?????? ? ??? ?? ????? ????????"'
     )
-    FARMA_FILE_EVENT: str = 'Получить файл: "Гайд по серотониновому синдрому"'
+    FARMA_FILE_EVENT: str = '???????? ????: "???? ?? ?????????????? ????????"'
 
     model_config = SettingsConfigDict(
         env_file="analytics.env",
