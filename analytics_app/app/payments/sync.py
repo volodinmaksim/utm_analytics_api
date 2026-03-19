@@ -81,6 +81,21 @@ async def run_payments_worker(
         await asyncio.sleep(sleep_seconds)
 
 
+async def sync_tracked_sheet_by_id(
+    tracked_sheet_id: int,
+    *,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+    client: GoogleSheetsClient | None = None,
+) -> SheetSyncResult:
+    session_factory = session_factory or get_session_factory()
+    client = client or get_google_sheets_client()
+    return await _sync_tracked_sheet(
+        tracked_sheet_id=tracked_sheet_id,
+        session_factory=session_factory,
+        client=client,
+    )
+
+
 async def _get_due_tracked_sheet_ids(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> list[int]:
@@ -248,3 +263,4 @@ def _is_sheet_due(tracked_sheet: TrackedSheet) -> bool:
         datetime.now(timezone.utc) - tracked_sheet.last_sync_finished_at
     ).total_seconds()
     return elapsed_seconds >= tracked_sheet.poll_interval_seconds
+
