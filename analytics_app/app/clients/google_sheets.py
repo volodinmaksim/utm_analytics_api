@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import json
 from dataclasses import dataclass
@@ -52,7 +50,7 @@ class GoogleSheetsClient:
         start_row: int = 2,
     ) -> list[GoogleSheetRow]:
         if start_row < 1:
-            raise ValueError('start_row must be greater than or equal to 1')
+            raise ValueError("start_row must be greater than or equal to 1")
 
         return await asyncio.to_thread(
             self._fetch_rows_sync,
@@ -77,13 +75,13 @@ class GoogleSheetsClient:
                     spreadsheetId=spreadsheet_id,
                     ranges=[range_name],
                     includeGridData=True,
-                    fields='sheets(data(startRow,rowData(values(formattedValue))))',
+                    fields="sheets(data(startRow,rowData(values(formattedValue))))",
                 )
                 .execute()
             )
         except Exception as exc:  # pragma: no cover - network/credentials path
             raise GoogleSheetsReadError(
-                f'Failed to read spreadsheet {spreadsheet_id} / {sheet_name}: {exc}'
+                f"Failed to read spreadsheet {spreadsheet_id} / {sheet_name}: {exc}"
             ) from exc
 
         return _parse_sheet_rows(response, fallback_start_row=start_row)
@@ -96,13 +94,13 @@ class GoogleSheetsClient:
             from googleapiclient.discovery import build
         except ImportError as exc:  # pragma: no cover - depends on optional deps
             raise GoogleSheetsConfigurationError(
-                'Google Sheets dependency is missing. Install google-api-python-client.'
+                "Google Sheets dependency is missing. Install google-api-python-client."
             ) from exc
 
         credentials = self.build_credentials()
         self._service = build(
-            'sheets',
-            'v4',
+            "sheets",
+            "v4",
             credentials=credentials,
             cache_discovery=False,
         )
@@ -113,7 +111,7 @@ class GoogleSheetsClient:
             from google.oauth2.service_account import Credentials
         except ImportError as exc:  # pragma: no cover - depends on optional deps
             raise GoogleSheetsConfigurationError(
-                'Google auth dependency is missing. Install google-auth.'
+                "Google auth dependency is missing. Install google-auth."
             ) from exc
 
         if self.credentials_json:
@@ -127,7 +125,7 @@ class GoogleSheetsClient:
             )
 
         raise GoogleSheetsConfigurationError(
-            'Google Sheets credentials are not configured. Set GOOGLE_SHEETS_SERVICE_ACCOUNT_FILE or GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON.'
+            "Google Sheets credentials are not configured. Set GOOGLE_SHEETS_SERVICE_ACCOUNT_FILE or GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON."
         )
 
 
@@ -140,10 +138,10 @@ def get_google_sheets_client() -> GoogleSheetsClient:
 
 
 def _parse_scopes(raw_scopes: str) -> tuple[str, ...]:
-    scopes = tuple(scope.strip() for scope in raw_scopes.split(',') if scope.strip())
+    scopes = tuple(scope.strip() for scope in raw_scopes.split(",") if scope.strip())
     if not scopes:
         raise GoogleSheetsConfigurationError(
-            'GOOGLE_SHEETS_SCOPES must contain at least one scope'
+            "GOOGLE_SHEETS_SCOPES must contain at least one scope"
         )
     return scopes
 
@@ -158,17 +156,17 @@ def _parse_sheet_rows(
     *,
     fallback_start_row: int,
 ) -> list[GoogleSheetRow]:
-    sheets = response.get('sheets') or []
+    sheets = response.get("sheets") or []
     if not sheets:
         return []
 
-    data_blocks = sheets[0].get('data') or []
+    data_blocks = sheets[0].get("data") or []
     if not data_blocks:
         return []
 
     data_block = data_blocks[0]
-    start_row_index = int(data_block.get('startRow', fallback_start_row - 1))
-    rows = data_block.get('rowData') or []
+    start_row_index = int(data_block.get("startRow", fallback_start_row - 1))
+    rows = data_block.get("rowData") or []
 
     parsed_rows: list[GoogleSheetRow] = []
     for offset, row in enumerate(rows):
@@ -190,15 +188,17 @@ def _parse_sheet_rows(
 
 
 def _extract_row_values(row: dict[str, Any]) -> list[str]:
-    cells = row.get('values') or []
-    values = [_cell_formatted_value(cell) for cell in cells[:_GOOGLE_SHEETS_COLUMN_COUNT]]
+    cells = row.get("values") or []
+    values = [
+        _cell_formatted_value(cell) for cell in cells[:_GOOGLE_SHEETS_COLUMN_COUNT]
+    ]
     if len(values) < _GOOGLE_SHEETS_COLUMN_COUNT:
-        values.extend([''] * (_GOOGLE_SHEETS_COLUMN_COUNT - len(values)))
+        values.extend([""] * (_GOOGLE_SHEETS_COLUMN_COUNT - len(values)))
     return values
 
 
 def _cell_formatted_value(cell: dict[str, Any]) -> str:
-    return str(cell.get('formattedValue') or '').strip()
+    return str(cell.get("formattedValue") or "").strip()
 
 
 def _optional_value(value: str) -> str | None:

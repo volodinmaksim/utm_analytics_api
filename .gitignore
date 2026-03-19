@@ -6,3 +6,5 @@
 datab/*
 
 skills/
+/secrets/
+**/*_smoke.py
