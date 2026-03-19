@@ -19,6 +19,9 @@ from analytics_app.app.models.dto import (
     FeedbackResponse,
     FunnelResponse,
     OverviewResponse,
+    PaymentOverviewResponse,
+    PaymentSourcesResponse,
+    PaymentTimeseriesResponse,
     Period,
     Service,
     TrackedSheetCreateRequest,
@@ -43,6 +46,9 @@ from analytics_app.app.services.analytics import (
     get_feedback,
     get_funnel,
     get_overview,
+    get_payment_overview,
+    get_payment_sources,
+    get_payment_timeseries,
     get_utm,
     get_wishes,
 )
@@ -83,11 +89,20 @@ async def create_tracked_sheet(
             sheet_name=payload.sheet_name,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except GoogleSheetsReadError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except GoogleSheetsConfigurationError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
     tracked_sheet = TrackedSheet(
         service=to_service_type(payload.service),
@@ -124,13 +139,19 @@ async def update_tracked_sheet(
 ) -> TrackedSheetResponse:
     tracked_sheet = await session.get(TrackedSheet, tracked_sheet_id)
     if tracked_sheet is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tracked sheet not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tracked sheet not found",
+        )
 
     next_sheet_name = payload.sheet_name or tracked_sheet.sheet_name
     next_service = payload.service or Service(tracked_sheet.service.value)
-    next_source = None
-    source_changed = payload.spreadsheet_url is not None or payload.spreadsheet_id is not None
-    sheet_name_changed = payload.sheet_name is not None and payload.sheet_name != tracked_sheet.sheet_name
+    source_changed = (
+        payload.spreadsheet_url is not None or payload.spreadsheet_id is not None
+    )
+    sheet_name_changed = (
+        payload.sheet_name is not None and payload.sheet_name != tracked_sheet.sheet_name
+    )
 
     if source_changed:
         try:
@@ -139,7 +160,10 @@ async def update_tracked_sheet(
                 spreadsheet_id=payload.spreadsheet_id,
             )
         except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
     else:
         next_source = normalize_spreadsheet_source(
             spreadsheet_url=tracked_sheet.spreadsheet_url,
@@ -153,9 +177,15 @@ async def update_tracked_sheet(
                 sheet_name=next_sheet_name,
             )
         except GoogleSheetsReadError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
         except GoogleSheetsConfigurationError as exc:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(exc),
+            ) from exc
 
     tracked_sheet.service = to_service_type(next_service)
     tracked_sheet.spreadsheet_id = next_source.spreadsheet_id
@@ -185,10 +215,16 @@ async def update_tracked_sheet(
     "/api/admin/tracked-sheets/{tracked_sheet_id}/sync",
     response_model=TrackedSheetSyncResponse,
 )
-async def sync_tracked_sheet(tracked_sheet_id: int, session: SessionDep) -> TrackedSheetSyncResponse:
+async def sync_tracked_sheet(
+    tracked_sheet_id: int,
+    session: SessionDep,
+) -> TrackedSheetSyncResponse:
     tracked_sheet = await session.get(TrackedSheet, tracked_sheet_id)
     if tracked_sheet is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tracked sheet not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tracked sheet not found",
+        )
 
     result = await sync_tracked_sheet_by_id(tracked_sheet_id)
     return TrackedSheetSyncResponse(
@@ -272,3 +308,43 @@ async def wishes(
     period: Period = Period.DAY,
 ) -> WishesResponse:
     return await get_wishes(session=session, service=service, period=period)
+
+
+@router.get(
+    "/api/analytics/payments/overview",
+    response_model=PaymentOverviewResponse,
+)
+async def payments_overview(
+    session: SessionDep,
+    service: Service = Service.RPP,
+    period: Period = Period.DAY,
+) -> PaymentOverviewResponse:
+    return await get_payment_overview(session=session, service=service, period=period)
+
+
+@router.get(
+    "/api/analytics/payments/timeseries",
+    response_model=PaymentTimeseriesResponse,
+)
+async def payments_timeseries(
+    session: SessionDep,
+    service: Service = Service.RPP,
+    period: Period = Period.DAY,
+) -> PaymentTimeseriesResponse:
+    return await get_payment_timeseries(
+        session=session,
+        service=service,
+        period=period,
+    )
+
+
+@router.get(
+    "/api/analytics/payments/sources",
+    response_model=PaymentSourcesResponse,
+)
+async def payments_sources(
+    session: SessionDep,
+    service: Service = Service.RPP,
+    period: Period = Period.DAY,
+) -> PaymentSourcesResponse:
+    return await get_payment_sources(session=session, service=service, period=period)

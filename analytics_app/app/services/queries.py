@@ -1,8 +1,16 @@
-﻿from sqlalchemy import Numeric, case, cast, func, select, text
+from sqlalchemy import Numeric, case, cast, func, select, text
 
 from analytics_app.app.db import settings
 from analytics_app.app.models.dto import Period, Service
-from analytics_app.app.models.orm import Events, FarmaEvent, FarmaUser, User
+from analytics_app.app.models.orm import (
+    Events,
+    FarmaEvent,
+    FarmaUser,
+    PaymentEvent,
+    PaymentEventType,
+    TrackedSheet,
+    User,
+)
 
 
 FEEDBACK_POSITIVE_VOTES = ("like", "up")
@@ -16,6 +24,14 @@ def _wish_prefixes() -> list[str]:
 
 def _event_model(service: Service):
     return Events if service == Service.RPP else FarmaEvent
+
+
+def _payment_identity_expr():
+    return func.coalesce(PaymentEvent.matched_user_tg_id, PaymentEvent.platform_id)
+
+
+def _payment_period_col(period: Period):
+    return func.date_trunc(period.value, PaymentEvent.event_date).label("period")
 
 
 def total_users(service: Service):
@@ -209,4 +225,134 @@ def file_clicks_timeseries(service: Service, period: Period):
         .where(ev.event_name == target)
         .group_by(text("period"))
         .order_by(text("period"))
+    )
+
+
+def payment_overview(service: Service):
+    payment_identity = _payment_identity_expr()
+    success_amount = cast(PaymentEvent.amount, Numeric)
+
+    return (
+        select(
+            func.count()
+            .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_CLICK)
+            .label("payment_clicks_count"),
+            func.count()
+            .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+            .label("successful_payments_count"),
+            func.count(func.distinct(payment_identity))
+            .filter(
+                (PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+                & (payment_identity.is_not(None))
+            )
+            .label("paid_users_count"),
+            func.coalesce(
+                func.sum(success_amount).filter(
+                    PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS
+                ),
+                0,
+            ).label("revenue_sum"),
+            func.avg(success_amount)
+            .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+            .label("avg_payment_amount"),
+            func.count()
+            .filter(
+                (PaymentEvent.matched_user_tg_id.is_(None))
+                & (PaymentEvent.event_type.in_((
+                    PaymentEventType.PAYMENT_CLICK,
+                    PaymentEventType.PAYMENT_SUCCESS,
+                )))
+            )
+            .label("unmatched_events_count"),
+        )
+        .select_from(PaymentEvent)
+        .where(PaymentEvent.service == service.value)
+    )
+
+
+def payment_timeseries(service: Service, period: Period):
+    period_col = _payment_period_col(period)
+    payment_identity = _payment_identity_expr()
+    success_amount = cast(PaymentEvent.amount, Numeric)
+
+    return (
+        select(
+            period_col,
+            func.count()
+            .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_CLICK)
+            .label("payment_clicks_count"),
+            func.count()
+            .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+            .label("successful_payments_count"),
+            func.coalesce(
+                func.sum(success_amount).filter(
+                    PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS
+                ),
+                0,
+            ).label("revenue_sum"),
+            func.count(func.distinct(payment_identity))
+            .filter(
+                (PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+                & (payment_identity.is_not(None))
+            )
+            .label("paid_users_count"),
+        )
+        .select_from(PaymentEvent)
+        .where(PaymentEvent.service == service.value)
+        .where(PaymentEvent.event_date.is_not(None))
+        .group_by(text("period"))
+        .order_by(text("period"))
+    )
+
+
+def payment_sources(service: Service):
+    success_amount = cast(PaymentEvent.amount, Numeric)
+
+    return (
+        select(
+            TrackedSheet.id.label("tracked_sheet_id"),
+            TrackedSheet.service.label("service"),
+            TrackedSheet.spreadsheet_id.label("spreadsheet_id"),
+            TrackedSheet.sheet_name.label("sheet_name"),
+            TrackedSheet.is_active.label("is_active"),
+            func.count(PaymentEvent.id).label("events_count"),
+            func.count(PaymentEvent.id)
+            .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_CLICK)
+            .label("payment_clicks_count"),
+            func.count(PaymentEvent.id)
+            .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+            .label("successful_payments_count"),
+            func.coalesce(
+                func.sum(success_amount).filter(
+                    PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS
+                ),
+                0,
+            ).label("revenue_sum"),
+            func.count(PaymentEvent.id)
+            .filter(PaymentEvent.matched_user_tg_id.is_(None))
+            .label("unmatched_events_count"),
+            TrackedSheet.last_sync_started_at.label("last_sync_started_at"),
+            TrackedSheet.last_sync_finished_at.label("last_sync_finished_at"),
+            TrackedSheet.last_sync_status.label("last_sync_status"),
+            TrackedSheet.last_sync_error.label("last_sync_error"),
+            TrackedSheet.last_sync_rows_read.label("last_sync_rows_read"),
+            TrackedSheet.last_sync_rows_inserted.label("last_sync_rows_inserted"),
+        )
+        .select_from(TrackedSheet)
+        .outerjoin(PaymentEvent, PaymentEvent.tracked_sheet_id == TrackedSheet.id)
+        .where(TrackedSheet.service == service.value)
+        .group_by(
+            TrackedSheet.id,
+            TrackedSheet.service,
+            TrackedSheet.spreadsheet_id,
+            TrackedSheet.sheet_name,
+            TrackedSheet.is_active,
+            TrackedSheet.last_sync_started_at,
+            TrackedSheet.last_sync_finished_at,
+            TrackedSheet.last_sync_status,
+            TrackedSheet.last_sync_error,
+            TrackedSheet.last_sync_rows_read,
+            TrackedSheet.last_sync_rows_inserted,
+        )
+        .order_by(TrackedSheet.id.desc())
     )

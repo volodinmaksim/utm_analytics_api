@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any, Awaitable, Callable, TypeVar
 
 from pydantic import BaseModel
@@ -16,6 +17,11 @@ from analytics_app.app.models.dto import (
     FunnelStepRow,
     NewUsersRow,
     OverviewResponse,
+    PaymentOverviewResponse,
+    PaymentSourceRow,
+    PaymentSourcesResponse,
+    PaymentTimeseriesResponse,
+    PaymentTimeseriesRow,
     Period,
     Service,
     UTMResponse,
@@ -83,6 +89,9 @@ SECTION_TTLS = {
     "utm": 180,
     "feedback": 60,
     "wishes": 20,
+    "payments_overview": 30,
+    "payments_timeseries": 60,
+    "payments_sources": 60,
 }
 
 cache = TTLCache(ttl_seconds=settings.CACHE_TTL)
@@ -107,6 +116,18 @@ def _pct(numerator: int, denominator: int) -> float | None:
     if denominator == 0:
         return None
     return round((numerator / denominator) * 100, 2)
+
+
+def _to_float(value: Decimal | float | int | None) -> float:
+    if value is None:
+        return 0.0
+    return float(value)
+
+
+def _to_optional_float(value: Decimal | float | int | None) -> float | None:
+    if value is None:
+        return None
+    return float(value)
 
 
 def _is_missing_table_error(exc: ProgrammingError) -> bool:
@@ -382,4 +403,149 @@ async def get_wishes(
         loader,
         WishesResponse,
         fallback=lambda: WishesResponse(service=service, items=[]),
+    )
+
+
+
+async def get_payment_overview(
+    session: AsyncSession, service: Service, period: Period
+) -> PaymentOverviewResponse:
+    async def loader(session: AsyncSession) -> PaymentOverviewResponse:
+        raw = await _exec_one(session, queries.payment_overview(service))
+        payment_clicks_count = int(raw.get("payment_clicks_count", 0) or 0)
+        successful_payments_count = int(raw.get("successful_payments_count", 0) or 0)
+        paid_users_count = int(raw.get("paid_users_count", 0) or 0)
+        revenue_sum = _to_float(raw.get("revenue_sum"))
+        avg_payment_amount = _to_optional_float(raw.get("avg_payment_amount"))
+        arppu = None
+        if paid_users_count > 0:
+            arppu = round(revenue_sum / paid_users_count, 2)
+
+        return PaymentOverviewResponse(
+            service=service,
+            period=period,
+            payment_clicks_count=payment_clicks_count,
+            successful_payments_count=successful_payments_count,
+            paid_users_count=paid_users_count,
+            revenue_sum=round(revenue_sum, 2),
+            avg_payment_amount=(
+                round(avg_payment_amount, 2)
+                if avg_payment_amount is not None
+                else None
+            ),
+            arppu=arppu,
+            click_to_success_conversion=_pct(
+                successful_payments_count,
+                payment_clicks_count,
+            ),
+            unmatched_events_count=int(raw.get("unmatched_events_count", 0) or 0),
+        )
+
+    return await _cached_section(
+        "payments_overview",
+        service,
+        period,
+        session,
+        loader,
+        PaymentOverviewResponse,
+        fallback=lambda: PaymentOverviewResponse(
+            service=service,
+            period=period,
+            payment_clicks_count=0,
+            successful_payments_count=0,
+            paid_users_count=0,
+            revenue_sum=0.0,
+            avg_payment_amount=None,
+            arppu=None,
+            click_to_success_conversion=None,
+            unmatched_events_count=0,
+        ),
+    )
+
+
+async def get_payment_timeseries(
+    session: AsyncSession, service: Service, period: Period
+) -> PaymentTimeseriesResponse:
+    async def loader(session: AsyncSession) -> PaymentTimeseriesResponse:
+        rows = await _exec_all(session, queries.payment_timeseries(service, period))
+        return PaymentTimeseriesResponse(
+            service=service,
+            period=period,
+            items=[
+                PaymentTimeseriesRow(
+                    period=item.get("period"),
+                    payment_clicks_count=int(item.get("payment_clicks_count", 0) or 0),
+                    successful_payments_count=int(item.get("successful_payments_count", 0) or 0),
+                    revenue_sum=round(_to_float(item.get("revenue_sum")), 2),
+                    paid_users_count=int(item.get("paid_users_count", 0) or 0),
+                )
+                for item in rows
+            ],
+        )
+
+    return await _cached_section(
+        "payments_timeseries",
+        service,
+        period,
+        session,
+        loader,
+        PaymentTimeseriesResponse,
+        fallback=lambda: PaymentTimeseriesResponse(
+            service=service,
+            period=period,
+            items=[],
+        ),
+    )
+
+
+async def get_payment_sources(
+    session: AsyncSession, service: Service, period: Period
+) -> PaymentSourcesResponse:
+    async def loader(session: AsyncSession) -> PaymentSourcesResponse:
+        rows = await _exec_all(session, queries.payment_sources(service))
+        return PaymentSourcesResponse(
+            service=service,
+            period=period,
+            items=[
+                PaymentSourceRow(
+                    tracked_sheet_id=int(item.get("tracked_sheet_id") or 0),
+                    service=Service(
+                        getattr(item.get("service"), "value", item.get("service"))
+                        or service.value
+                    ),
+                    spreadsheet_id=str(item.get("spreadsheet_id") or ""),
+                    sheet_name=str(item.get("sheet_name") or ""),
+                    is_active=bool(item.get("is_active")),
+                    events_count=int(item.get("events_count", 0) or 0),
+                    payment_clicks_count=int(item.get("payment_clicks_count", 0) or 0),
+                    successful_payments_count=int(item.get("successful_payments_count", 0) or 0),
+                    revenue_sum=round(_to_float(item.get("revenue_sum")), 2),
+                    unmatched_events_count=int(item.get("unmatched_events_count", 0) or 0),
+                    last_sync_started_at=item.get("last_sync_started_at"),
+                    last_sync_finished_at=item.get("last_sync_finished_at"),
+                    last_sync_status=(
+                        getattr(item.get("last_sync_status"), "value", item.get("last_sync_status"))
+                        if item.get("last_sync_status") is not None
+                        else None
+                    ),
+                    last_sync_error=item.get("last_sync_error"),
+                    last_sync_rows_read=item.get("last_sync_rows_read"),
+                    last_sync_rows_inserted=item.get("last_sync_rows_inserted"),
+                )
+                for item in rows
+            ],
+        )
+
+    return await _cached_section(
+        "payments_sources",
+        service,
+        period,
+        session,
+        loader,
+        PaymentSourcesResponse,
+        fallback=lambda: PaymentSourcesResponse(
+            service=service,
+            period=period,
+            items=[],
+        ),
     )
