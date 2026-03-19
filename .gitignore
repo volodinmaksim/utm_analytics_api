@@ -8,3 +8,5 @@ datab/*
 skills/
 /secrets/
 **/*_smoke.py
+
+*.dump

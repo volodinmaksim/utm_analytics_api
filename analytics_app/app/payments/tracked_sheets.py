@@ -56,8 +56,10 @@ async def validate_tracked_sheet_access(
     )
 
 
-def to_service_type(service: Service) -> ServiceType:
-    return ServiceType(service.value)
+def to_service_type(service: Service | str) -> ServiceType:
+    if isinstance(service, Service):
+        return ServiceType(service.value)
+    return ServiceType(service)
 
 
 def to_tracked_sheet_response(tracked_sheet: TrackedSheet) -> TrackedSheetResponse:

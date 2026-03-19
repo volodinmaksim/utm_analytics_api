@@ -1,13 +1,22 @@
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from analytics_app.app.admin_auth import (
+    AdminApiDep,
+    ensure_admin_auth_configured,
+    is_admin_authenticated,
+    login_admin,
+    logout_admin,
+    verify_admin_password,
+)
 from analytics_app.app.clients.google_sheets import (
     GoogleSheetsConfigurationError,
     GoogleSheetsReadError,
@@ -22,6 +31,8 @@ from analytics_app.app.models.dto import (
     PaymentOverviewResponse,
     PaymentSourcesResponse,
     PaymentTimeseriesResponse,
+    PaymentUserDetailResponse,
+    RecentPaymentsResponse,
     Period,
     Service,
     TrackedSheetCreateRequest,
@@ -49,6 +60,8 @@ from analytics_app.app.services.analytics import (
     get_payment_overview,
     get_payment_sources,
     get_payment_timeseries,
+    get_payment_user_detail,
+    get_recent_payments,
     get_utm,
     get_wishes,
 )
@@ -61,8 +74,89 @@ templates = Jinja2Templates(
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
+async def _get_tracked_sheet_or_404(
+    session: AsyncSession,
+    tracked_sheet_id: int,
+) -> TrackedSheet:
+    tracked_sheet = await session.get(TrackedSheet, tracked_sheet_id)
+    if tracked_sheet is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tracked sheet not found",
+        )
+    return tracked_sheet
+
+
+def _admin_login_redirect(request: Request) -> RedirectResponse:
+    return RedirectResponse(
+        url=str(request.url_for("admin_login_page")),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get("/admin/login", response_class=HTMLResponse, name="admin_login_page")
+async def admin_login_page(request: Request) -> HTMLResponse:
+    ensure_admin_auth_configured()
+    if is_admin_authenticated(request):
+        return RedirectResponse(
+            url=str(request.url_for("admin_page")),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_login.html",
+        context={"error": None},
+    )
+
+
+@router.post("/admin/login", response_class=HTMLResponse)
+async def admin_login_submit(request: Request) -> Response:
+    ensure_admin_auth_configured()
+    body = (await request.body()).decode("utf-8")
+    password = (parse_qs(body).get("password") or [""])[0]
+    if not verify_admin_password(password):
+        return templates.TemplateResponse(
+            request=request,
+            name="admin_login.html",
+            context={"error": "Invalid password"},
+        )
+
+    response = RedirectResponse(
+        url=str(request.url_for("admin_page")),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+    login_admin(response)
+    return response
+
+
+@router.post("/admin/logout")
+async def admin_logout(request: Request) -> RedirectResponse:
+    response = RedirectResponse(
+        url=str(request.url_for("admin_login_page")),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+    logout_admin(response)
+    return response
+
+
+@router.get("/admin", response_class=HTMLResponse, name="admin_page")
+async def admin_page(request: Request) -> HTMLResponse:
+    ensure_admin_auth_configured()
+    if not is_admin_authenticated(request):
+        return _admin_login_redirect(request)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin.html",
+        context={"base_url": settings.BASE_URL.rstrip("/")},
+    )
+
+
 @router.get("/api/admin/tracked-sheets", response_model=TrackedSheetsListResponse)
-async def list_tracked_sheets(session: SessionDep) -> TrackedSheetsListResponse:
+async def list_tracked_sheets(
+    _admin: AdminApiDep,
+    session: SessionDep,
+) -> TrackedSheetsListResponse:
     stmt = select(TrackedSheet).order_by(TrackedSheet.id.desc())
     items = (await session.execute(stmt)).scalars().all()
     return TrackedSheetsListResponse(
@@ -77,6 +171,7 @@ async def list_tracked_sheets(session: SessionDep) -> TrackedSheetsListResponse:
 )
 async def create_tracked_sheet(
     payload: TrackedSheetCreateRequest,
+    _admin: AdminApiDep,
     session: SessionDep,
 ) -> TrackedSheetResponse:
     try:
@@ -119,9 +214,15 @@ async def create_tracked_sheet(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
+        message = str(getattr(exc, "orig", exc))
+        if "uq_tracked_sheets_spreadsheet_id_sheet_name" in message or "duplicate key value" in message:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Tracked sheet with the same spreadsheet_id and sheet_name already exists",
+            ) from exc
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Tracked sheet with the same spreadsheet_id and sheet_name already exists",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
         ) from exc
 
     await session.refresh(tracked_sheet)
@@ -135,14 +236,10 @@ async def create_tracked_sheet(
 async def update_tracked_sheet(
     tracked_sheet_id: int,
     payload: TrackedSheetUpdateRequest,
+    _admin: AdminApiDep,
     session: SessionDep,
 ) -> TrackedSheetResponse:
-    tracked_sheet = await session.get(TrackedSheet, tracked_sheet_id)
-    if tracked_sheet is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tracked sheet not found",
-        )
+    tracked_sheet = await _get_tracked_sheet_or_404(session, tracked_sheet_id)
 
     next_sheet_name = payload.sheet_name or tracked_sheet.sheet_name
     next_service = payload.service or Service(tracked_sheet.service.value)
@@ -202,13 +299,66 @@ async def update_tracked_sheet(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
+        message = str(getattr(exc, "orig", exc))
+        if "uq_tracked_sheets_spreadsheet_id_sheet_name" in message or "duplicate key value" in message:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Tracked sheet with the same spreadsheet_id and sheet_name already exists",
+            ) from exc
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Tracked sheet with the same spreadsheet_id and sheet_name already exists",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
         ) from exc
 
     await session.refresh(tracked_sheet)
     return to_tracked_sheet_response(tracked_sheet)
+
+
+@router.post(
+    "/api/admin/tracked-sheets/{tracked_sheet_id}/activate",
+    response_model=TrackedSheetResponse,
+)
+async def activate_tracked_sheet(
+    tracked_sheet_id: int,
+    _admin: AdminApiDep,
+    session: SessionDep,
+) -> TrackedSheetResponse:
+    tracked_sheet = await _get_tracked_sheet_or_404(session, tracked_sheet_id)
+    tracked_sheet.is_active = True
+    await session.commit()
+    await session.refresh(tracked_sheet)
+    return to_tracked_sheet_response(tracked_sheet)
+
+
+@router.post(
+    "/api/admin/tracked-sheets/{tracked_sheet_id}/deactivate",
+    response_model=TrackedSheetResponse,
+)
+async def deactivate_tracked_sheet(
+    tracked_sheet_id: int,
+    _admin: AdminApiDep,
+    session: SessionDep,
+) -> TrackedSheetResponse:
+    tracked_sheet = await _get_tracked_sheet_or_404(session, tracked_sheet_id)
+    tracked_sheet.is_active = False
+    await session.commit()
+    await session.refresh(tracked_sheet)
+    return to_tracked_sheet_response(tracked_sheet)
+
+
+@router.delete(
+    "/api/admin/tracked-sheets/{tracked_sheet_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_tracked_sheet(
+    tracked_sheet_id: int,
+    _admin: AdminApiDep,
+    session: SessionDep,
+) -> Response:
+    tracked_sheet = await _get_tracked_sheet_or_404(session, tracked_sheet_id)
+    await session.delete(tracked_sheet)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -217,15 +367,10 @@ async def update_tracked_sheet(
 )
 async def sync_tracked_sheet(
     tracked_sheet_id: int,
+    _admin: AdminApiDep,
     session: SessionDep,
 ) -> TrackedSheetSyncResponse:
-    tracked_sheet = await session.get(TrackedSheet, tracked_sheet_id)
-    if tracked_sheet is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tracked sheet not found",
-        )
-
+    await _get_tracked_sheet_or_404(session, tracked_sheet_id)
     result = await sync_tracked_sheet_by_id(tracked_sheet_id)
     return TrackedSheetSyncResponse(
         tracked_sheet_id=result.tracked_sheet_id,
@@ -240,6 +385,10 @@ async def sync_tracked_sheet(
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
+    ensure_admin_auth_configured()
+    if not is_admin_authenticated(request):
+        return _admin_login_redirect(request)
+
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
@@ -249,6 +398,7 @@ async def dashboard(request: Request) -> HTMLResponse:
 
 @router.get("/api/analytics/overview", response_model=OverviewResponse)
 async def overview(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -258,6 +408,7 @@ async def overview(
 
 @router.get("/api/analytics/funnel", response_model=FunnelResponse)
 async def funnel(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -267,6 +418,7 @@ async def funnel(
 
 @router.get("/api/analytics/audience", response_model=AudienceResponse)
 async def audience(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -276,6 +428,7 @@ async def audience(
 
 @router.get("/api/analytics/content", response_model=ContentResponse)
 async def content(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -285,6 +438,7 @@ async def content(
 
 @router.get("/api/analytics/utm", response_model=UTMResponse)
 async def utm(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -294,6 +448,7 @@ async def utm(
 
 @router.get("/api/analytics/feedback", response_model=FeedbackResponse)
 async def feedback(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -303,6 +458,7 @@ async def feedback(
 
 @router.get("/api/analytics/wishes", response_model=WishesResponse)
 async def wishes(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -315,6 +471,7 @@ async def wishes(
     response_model=PaymentOverviewResponse,
 )
 async def payments_overview(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -327,6 +484,7 @@ async def payments_overview(
     response_model=PaymentTimeseriesResponse,
 )
 async def payments_timeseries(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
@@ -343,8 +501,49 @@ async def payments_timeseries(
     response_model=PaymentSourcesResponse,
 )
 async def payments_sources(
+    _admin: AdminApiDep,
     session: SessionDep,
     service: Service = Service.RPP,
     period: Period = Period.DAY,
 ) -> PaymentSourcesResponse:
     return await get_payment_sources(session=session, service=service, period=period)
+
+
+@router.get(
+    "/api/analytics/payments/recent",
+    response_model=RecentPaymentsResponse,
+)
+async def recent_payments(
+    _admin: AdminApiDep,
+    session: SessionDep,
+    service: Service = Service.RPP,
+    limit: int = 10,
+) -> RecentPaymentsResponse:
+    safe_limit = max(1, min(limit, 100))
+    return await get_recent_payments(session=session, service=service, limit=safe_limit)
+
+
+@router.get(
+    "/api/analytics/payments/user-detail",
+    response_model=PaymentUserDetailResponse,
+)
+async def payment_user_detail(
+    _admin: AdminApiDep,
+    session: SessionDep,
+    service: Service = Service.RPP,
+    matched_user_tg_id: int = 0,
+) -> PaymentUserDetailResponse:
+    if matched_user_tg_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="matched_user_tg_id must be a positive integer",
+        )
+
+    try:
+        return await get_payment_user_detail(
+            session=session,
+            service=service,
+            matched_user_tg_id=matched_user_tg_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

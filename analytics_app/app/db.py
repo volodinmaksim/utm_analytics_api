@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     HOST: str
     PORT: int
     BASE_URL: str
+    ADMIN_PASSWORD: str
+    ADMIN_SESSION_SECRET: str
+    ADMIN_SESSION_COOKIE: str
+    ADMIN_SESSION_MAX_AGE: int
     GOOGLE_SHEETS_SERVICE_ACCOUNT_FILE: str | None = None
     GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: str | None = None
     GOOGLE_SHEETS_SCOPES: str = "https://www.googleapis.com/auth/spreadsheets.readonly"

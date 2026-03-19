@@ -1,4 +1,4 @@
-from sqlalchemy import Numeric, case, cast, func, select, text
+from sqlalchemy import Numeric, case, cast, exists, func, select, text
 
 from analytics_app.app.db import settings
 from analytics_app.app.models.dto import Period, Service
@@ -32,6 +32,33 @@ def _payment_identity_expr():
 
 def _payment_period_col(period: Period):
     return func.date_trunc(period.value, PaymentEvent.event_date).label("period")
+
+
+def _matched_payment_after_join_condition(service: Service):
+    if service == Service.RPP:
+        return (
+            PaymentEvent.user_id.is_not(None)
+            & PaymentEvent.event_date.is_not(None)
+            & exists(
+                select(1)
+                .select_from(User)
+                .where(User.id == PaymentEvent.user_id)
+                .where(User.join_date.is_not(None))
+                .where(PaymentEvent.event_date >= User.join_date)
+            )
+        )
+
+    return (
+        PaymentEvent.farma_user_id.is_not(None)
+        & PaymentEvent.event_date.is_not(None)
+        & exists(
+            select(1)
+            .select_from(FarmaUser)
+            .where(FarmaUser.id == PaymentEvent.farma_user_id)
+            .where(FarmaUser.join_date.is_not(None))
+            .where(PaymentEvent.event_date >= FarmaUser.join_date)
+        )
+    )
 
 
 def total_users(service: Service):
@@ -109,6 +136,56 @@ def utm_marks(service: Service):
         .where(func.btrim(col) != "")
         .group_by(normalized_utm)
         .order_by(text("users DESC"), text("utm_mark ASC"))
+    )
+
+
+def utm_payment_efficiency(service: Service):
+    if service == Service.RPP:
+        user_model = User
+        join_col = PaymentEvent.user_id
+        event_model = Events
+        file_event_name = settings.RPP_FILE_EVENT
+    else:
+        user_model = FarmaUser
+        join_col = PaymentEvent.farma_user_id
+        event_model = FarmaEvent
+        file_event_name = settings.FARMA_FILE_EVENT
+
+    utm_col = func.btrim(user_model.utm_mark).label("utm_mark")
+    success_amount = cast(PaymentEvent.amount, Numeric)
+    file_received_condition = exists(
+        select(1)
+        .select_from(event_model)
+        .where(event_model.user_id == user_model.id)
+        .where(event_model.event_name == file_event_name)
+    )
+
+    return (
+        select(
+            utm_col,
+            func.count(func.distinct(user_model.id)).label("users"),
+            func.count(func.distinct(user_model.id))
+            .filter(file_received_condition)
+            .label("file_received_users"),
+            func.count(func.distinct(user_model.id))
+            .filter(PaymentEvent.id.is_not(None))
+            .label("paid_users"),
+            func.coalesce(func.sum(success_amount), 0).label("revenue_sum"),
+        )
+        .select_from(user_model)
+        .outerjoin(
+            PaymentEvent,
+            (join_col == user_model.id)
+            & (PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+            & (PaymentEvent.service == service.value)
+            & (PaymentEvent.event_date.is_not(None))
+            & (user_model.join_date.is_not(None))
+            & (PaymentEvent.event_date >= user_model.join_date),
+        )
+        .where(user_model.utm_mark.is_not(None))
+        .where(func.btrim(user_model.utm_mark) != "")
+        .group_by(utm_col)
+        .order_by(text("revenue_sum DESC"), text("users DESC"), text("utm_mark ASC"))
     )
 
 
@@ -231,6 +308,10 @@ def file_clicks_timeseries(service: Service, period: Period):
 def payment_overview(service: Service):
     payment_identity = _payment_identity_expr()
     success_amount = cast(PaymentEvent.amount, Numeric)
+    matched_success = (
+        (PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+        & _matched_payment_after_join_condition(service)
+    )
 
     return (
         select(
@@ -246,12 +327,21 @@ def payment_overview(service: Service):
                 & (payment_identity.is_not(None))
             )
             .label("paid_users_count"),
+            func.count()
+            .filter(matched_success)
+            .label("matched_successful_payments_count"),
+            func.count(func.distinct(PaymentEvent.matched_user_tg_id))
+            .filter(matched_success)
+            .label("matched_paid_users_count"),
             func.coalesce(
                 func.sum(success_amount).filter(
                     PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS
                 ),
                 0,
             ).label("revenue_sum"),
+            func.coalesce(func.sum(success_amount).filter(matched_success), 0).label(
+                "matched_revenue_sum"
+            ),
             func.avg(success_amount)
             .filter(PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
             .label("avg_payment_amount"),
@@ -355,4 +445,120 @@ def payment_sources(service: Service):
             TrackedSheet.last_sync_rows_inserted,
         )
         .order_by(TrackedSheet.id.desc())
+    )
+
+
+
+def recent_payments(service: Service, limit: int = 10):
+    return (
+        select(
+            PaymentEvent.event_date.label("event_date"),
+            cast(PaymentEvent.amount, Numeric).label("amount"),
+            PaymentEvent.nickname.label("nickname"),
+            PaymentEvent.full_name.label("full_name"),
+            PaymentEvent.email.label("email"),
+            PaymentEvent.matched_user_tg_id.label("matched_user_tg_id"),
+            PaymentEvent.source_sheet_name.label("source_sheet_name"),
+        )
+        .select_from(PaymentEvent)
+        .where(PaymentEvent.service == service.value)
+        .where(PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+        .where(_matched_payment_after_join_condition(service))
+        .order_by(PaymentEvent.event_date.desc().nullslast(), PaymentEvent.id.desc())
+        .limit(limit)
+    )
+
+
+def payment_user_profile(service: Service, matched_user_tg_id: int):
+    if service == Service.RPP:
+        return (
+            select(
+                User.username.label("username"),
+                User.tg_id.label("matched_user_tg_id"),
+                User.join_date.label("join_date"),
+                User.utm_mark.label("utm_mark"),
+            )
+            .select_from(User)
+            .where(User.tg_id == matched_user_tg_id)
+        )
+
+    return (
+        select(
+            FarmaUser.username.label("username"),
+            FarmaUser.tg_id.label("matched_user_tg_id"),
+            FarmaUser.join_date.label("join_date"),
+            FarmaUser.utm_mark.label("utm_mark"),
+        )
+        .select_from(FarmaUser)
+        .where(FarmaUser.tg_id == matched_user_tg_id)
+    )
+
+
+def payment_user_step_events(service: Service, matched_user_tg_id: int, event_names: tuple[str, ...]):
+    ev = _event_model(service)
+
+    if service == Service.RPP:
+        user_join = ev.user_id == User.id
+        user_filter = User.tg_id == matched_user_tg_id
+    else:
+        user_join = ev.user_id == FarmaUser.id
+        user_filter = FarmaUser.tg_id == matched_user_tg_id
+
+    return (
+        select(
+            ev.event_name.label("event_name"),
+            func.max(ev.timestamp).label("completed_at"),
+        )
+        .select_from(ev)
+        .join(User if service == Service.RPP else FarmaUser, user_join)
+        .where(user_filter)
+        .where(ev.event_name.in_(event_names))
+        .group_by(ev.event_name)
+    )
+
+
+def payment_user_feedback(service: Service, matched_user_tg_id: int, limit: int = 10):
+    ev = _event_model(service)
+    name = ev.event_name
+    vote_type = func.split_part(name, "_", 2).label("vote")
+    post_id = func.split_part(name, "_", 3).label("post_id")
+
+    if service == Service.RPP:
+        user_join = ev.user_id == User.id
+        user_filter = User.tg_id == matched_user_tg_id
+    else:
+        user_join = ev.user_id == FarmaUser.id
+        user_filter = FarmaUser.tg_id == matched_user_tg_id
+
+    return (
+        select(
+            ev.timestamp.label("timestamp"),
+            post_id,
+            vote_type,
+        )
+        .select_from(ev)
+        .join(User if service == Service.RPP else FarmaUser, user_join)
+        .where(user_filter)
+        .where(name.like("feedback_%") | name.like("fb_%"))
+        .where(post_id.is_not(None))
+        .where(func.btrim(post_id) != "")
+        .order_by(ev.timestamp.desc())
+        .limit(limit)
+    )
+
+
+def payment_user_payments(service: Service, matched_user_tg_id: int, limit: int = 20):
+    return (
+        select(
+            PaymentEvent.event_date.label("event_date"),
+            cast(PaymentEvent.amount, Numeric).label("amount"),
+            PaymentEvent.source_sheet_name.label("source_sheet_name"),
+        )
+        .select_from(PaymentEvent)
+        .where(PaymentEvent.service == service.value)
+        .where(PaymentEvent.event_type == PaymentEventType.PAYMENT_SUCCESS)
+        .where(PaymentEvent.matched_user_tg_id == matched_user_tg_id)
+        .where(_matched_payment_after_join_condition(service))
+        .order_by(PaymentEvent.event_date.desc().nullslast(), PaymentEvent.id.desc())
+        .limit(limit)
     )

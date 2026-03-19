@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Admin{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(249,115,22,0.16),_transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_45%,#fff7ed_100%)] px-4 py-8 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-7xl space-y-6">
+    <header class="overflow-hidden rounded-[32px] border border-white/70 bg-slate-950 text-white shadow-2xl shadow-slate-300/40">
+      <div class="grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:px-8">
+        <div class="space-y-4">
+          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/80">Analytics Control Room</p>
+          <div>
+            <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Управление payment-источниками</h1>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-start gap-3 lg:justify-end">
+          <a href="/" class="rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15">
+            К dashboard
+          </a>
+          <form method="post" action="/admin/logout">
+            <button type="submit" class="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-200">
+              Выйти
+            </button>
+          </form>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <div class="rounded-[30px] border border-white/70 bg-white/85 p-6 shadow-xl shadow-slate-200/70 backdrop-blur">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">New Source</p>
+            <h2 class="mt-2 text-2xl font-semibold text-slate-950">Добавить лист</h2>
+            <p class="mt-2 text-sm text-slate-600">
+              Достаточно вставить ссылку на Google Sheet и точное имя вкладки.
+            </p>
+          </div>
+        </div>
+
+        <form id="sheet-form" class="mt-6 space-y-4">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">Сервис</span>
+            <select id="service" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200">
+              <option value="rpp">rpp</option>
+              <option value="farma">farma</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">Ссылка на Google Sheet</span>
+            <input id="spreadsheet-url" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200">
+          </label>
+
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">Имя вкладки</span>
+            <input id="sheet-name" type="text" required placeholder="v22/farma 13.03.26" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200">
+          </label>
+
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">Интервал опроса, сек</span>
+            <input id="poll-interval-seconds" type="number" min="1" value="600" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200">
+          </label>
+
+          <label class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <input id="is-active" type="checkbox" checked class="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-900">
+            <span class="text-sm font-medium text-slate-700">Запустить источник сразу после сохранения</span>
+          </label>
+
+          <div id="form-error" class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></div>
+          <div id="form-success" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"></div>
+
+          <button id="form-submit" type="submit" class="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+            Подключить источник
+          </button>
+        </form>
+      </div>
+
+      <div class="space-y-6">
+        <section class="grid gap-4 sm:grid-cols-2">
+          <div class="rounded-[26px] border border-white/70 bg-white/85 p-5 shadow-lg shadow-slate-200/60 backdrop-blur">
+            <div class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Registry</div>
+            <div id="total-sources" class="mt-3 text-3xl font-semibold text-slate-950">0</div>
+            <p class="mt-2 text-sm text-slate-500">Всего подключенных tracked sheets</p>
+          </div>
+          <div class="rounded-[26px] border border-emerald-200 bg-emerald-50/80 p-5 shadow-lg shadow-emerald-100/80">
+            <div class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">Active</div>
+            <div id="active-sources" class="mt-3 text-3xl font-semibold text-emerald-950">0</div>
+            <p class="mt-2 text-sm text-emerald-800/80">Источники, которые читает worker</p>
+          </div>
+        </section>
+
+        <section class="rounded-[30px] border border-white/70 bg-white/85 p-6 shadow-xl shadow-slate-200/70 backdrop-blur">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Tracked Sheets</p>
+            <h2 class="mt-2 text-2xl font-semibold text-slate-950">Источники</h2>
+          </div>
+            <button id="reload-button" type="button" class="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-950 hover:text-slate-950">
+              Обновить список
+            </button>
+          </div>
+
+          <div id="table-message" class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Загрузка списка источников...
+          </div>
+
+          <div id="tracked-sheets-grid" class="mt-5 grid gap-4 lg:grid-cols-2"></div>
+        </section>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const els = {
+  form: document.getElementById("sheet-form"),
+  service: document.getElementById("service"),
+  spreadsheetUrl: document.getElementById("spreadsheet-url"),
+  sheetName: document.getElementById("sheet-name"),
+  pollIntervalSeconds: document.getElementById("poll-interval-seconds"),
+  isActive: document.getElementById("is-active"),
+  formSubmit: document.getElementById("form-submit"),
+  formError: document.getElementById("form-error"),
+  formSuccess: document.getElementById("form-success"),
+  reloadButton: document.getElementById("reload-button"),
+  tableMessage: document.getElementById("table-message"),
+  grid: document.getElementById("tracked-sheets-grid"),
+  totalSources: document.getElementById("total-sources"),
+  activeSources: document.getElementById("active-sources"),
+};
+
+function showBox(el, message) {
+  el.textContent = message;
+  el.classList.remove("hidden");
+}
+
+function hideBox(el) {
+  el.textContent = "";
+  el.classList.add("hidden");
+}
+
+function clearMessages() {
+  hideBox(els.formError);
+  hideBox(els.formSuccess);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function fmtDate(value) {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("ru-RU");
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+
+  if (response.status === 401) {
+    window.location.href = "/admin/login";
+    throw new Error("Unauthorized");
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = data && typeof data.detail === "string" ? data.detail : `Request failed: ${response.status}`;
+    throw new Error(detail);
+  }
+  return data;
+}
+
+function resetForm() {
+  els.service.value = "rpp";
+  els.spreadsheetUrl.value = "";
+  els.sheetName.value = "";
+  els.pollIntervalSeconds.value = "600";
+  els.isActive.checked = true;
+  clearMessages();
+}
+
+function collectFormPayload() {
+  return {
+    service: els.service.value,
+    spreadsheet_url: els.spreadsheetUrl.value.trim() || null,
+    spreadsheet_id: null,
+    sheet_name: els.sheetName.value.trim(),
+    poll_interval_seconds: Number(els.pollIntervalSeconds.value || 600),
+    is_active: els.isActive.checked,
+  };
+}
+
+function updateCounters(items) {
+  const total = items.length;
+  const active = items.filter((item) => item.is_active).length;
+  els.totalSources.textContent = String(total);
+  els.activeSources.textContent = String(active);
+}
+
+function renderRows(items) {
+  updateCounters(items);
+
+  if (!items.length) {
+    els.grid.innerHTML = "";
+    els.tableMessage.textContent = "Источники пока не добавлены. Подключи первый Google Sheet слева.";
+    return;
+  }
+
+  els.tableMessage.textContent = `Подключено источников: ${items.length}`;
+  els.grid.innerHTML = items.map((item) => {
+    const syncTone = item.last_sync_status === "error"
+      ? "border-rose-200 bg-rose-50 text-rose-700"
+      : item.last_sync_status === "ok"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-amber-200 bg-amber-50 text-amber-700";
+    const liveTone = item.is_active
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : "border-slate-200 bg-slate-100 text-slate-600";
+    const actionToggle = item.is_active
+      ? `<button data-action="deactivate" data-id="${item.id}" class="rounded-2xl border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:border-amber-500 hover:bg-amber-50">Deactivate</button>`
+      : `<button data-action="activate" data-id="${item.id}" class="rounded-2xl border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-500 hover:bg-emerald-50">Activate</button>`;
+
+    return `
+      <article class="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="rounded-full border ${liveTone} px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]">${item.is_active ? "active" : "inactive"}</span>
+              <span class="rounded-full border ${syncTone} px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]">${escapeHtml(item.last_sync_status || "new")}</span>
+            </div>
+            <h3 class="mt-3 truncate text-lg font-semibold text-slate-950">${escapeHtml(item.sheet_name)}</h3>
+            <p class="mt-1 text-sm text-slate-500">${escapeHtml(item.service)} • row checkpoint ${escapeHtml(item.last_seen_row_num ?? "-")}</p>
+          </div>
+          <a href="${escapeHtml(item.spreadsheet_url)}" target="_blank" rel="noreferrer" class="shrink-0 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100">
+            Open Sheet
+          </a>
+        </div>
+
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-2xl bg-slate-50 px-4 py-3">
+            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Last sync</div>
+            <div class="mt-2 text-sm font-medium text-slate-800">${escapeHtml(fmtDate(item.last_sync_finished_at))}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 px-4 py-3">
+            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Read / Inserted</div>
+            <div class="mt-2 text-sm font-medium text-slate-800">${escapeHtml(item.last_sync_rows_read ?? "-")} / ${escapeHtml(item.last_sync_rows_inserted ?? "-")}</div>
+          </div>
+        </div>
+
+        <div class="mt-4 min-h-5 text-xs text-rose-600">${escapeHtml(item.last_sync_error || "")}</div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button data-action="sync" data-id="${item.id}" class="rounded-2xl border border-sky-300 px-3 py-2 text-xs font-semibold text-sky-700 transition hover:border-sky-500 hover:bg-sky-50">Sync</button>
+          ${actionToggle}
+          <button data-action="delete" data-id="${item.id}" data-name="${escapeHtml(item.sheet_name)}" class="rounded-2xl border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-500 hover:bg-rose-50">Delete</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+async function loadTrackedSheets() {
+  els.reloadButton.disabled = true;
+  try {
+    const data = await api("/api/admin/tracked-sheets", { method: "GET" });
+    renderRows(data.items || []);
+  } catch (error) {
+    els.grid.innerHTML = "";
+    els.tableMessage.textContent = error.message;
+  } finally {
+    els.reloadButton.disabled = false;
+  }
+}
+
+async function submitForm(event) {
+  event.preventDefault();
+  clearMessages();
+
+  try {
+    await api("/api/admin/tracked-sheets", {
+      method: "POST",
+      body: JSON.stringify(collectFormPayload()),
+    });
+    showBox(els.formSuccess, "Источник добавлен");
+    resetForm();
+    await loadTrackedSheets();
+  } catch (error) {
+    showBox(els.formError, error.message);
+  }
+}
+
+async function handleGridClick(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  const action = button.dataset.action;
+  const id = button.dataset.id;
+
+  try {
+    button.disabled = true;
+
+    if (action === "sync") {
+      const result = await api(`/api/admin/tracked-sheets/${id}/sync`, { method: "POST" });
+      showBox(els.formSuccess, `Sync завершен: status=${result.status}, inserted=${result.rows_inserted}`);
+    }
+
+    if (action === "activate") {
+      await api(`/api/admin/tracked-sheets/${id}/activate`, { method: "POST" });
+      showBox(els.formSuccess, `Источник #${id} активирован`);
+    }
+
+    if (action === "deactivate") {
+      await api(`/api/admin/tracked-sheets/${id}/deactivate`, { method: "POST" });
+      showBox(els.formSuccess, `Источник #${id} деактивирован`);
+    }
+
+    if (action === "delete") {
+      const name = button.dataset.name || id;
+      const confirmed = window.confirm(`Удалить источник ${name}? Его payment events тоже будут удалены.`);
+      if (!confirmed) return;
+      await api(`/api/admin/tracked-sheets/${id}`, { method: "DELETE" });
+      showBox(els.formSuccess, `Источник #${id} удален`);
+    }
+
+    await loadTrackedSheets();
+  } catch (error) {
+    showBox(els.formError, error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+els.form.addEventListener("submit", submitForm);
+els.reloadButton.addEventListener("click", loadTrackedSheets);
+els.grid.addEventListener("click", handleGridClick);
+
+resetForm();
+loadTrackedSheets();
+</script>
+{% endblock %}

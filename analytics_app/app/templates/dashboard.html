@@ -3,31 +3,54 @@
 {% block title %}UTM Analytics{% endblock %}
 
 {% block body %}
-<div class="max-w-7xl mx-auto p-6">
-  <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-    <div>
-      <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Analytics</p>
-      <h1 class="text-3xl font-bold text-slate-900">UTM Analytics Dashboard</h1>
-      <p class="mt-2 text-sm text-slate-600">BASE_URL: <code>{{ base_url }}</code></p>
-    </div>
+<div class="mx-auto max-w-7xl p-6">
+  <section class="overflow-hidden rounded-[32px] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(234,179,8,0.12),_transparent_26%),linear-gradient(135deg,#020617_0%,#0f172a_54%,#172554_100%)] px-6 py-7 text-white shadow-2xl shadow-slate-300/40">
+    <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div class="max-w-3xl">
+        <p class="text-xs uppercase tracking-[0.3em] text-sky-200/80">Analytics</p>
+        <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">UTM Analytics Dashboard</h1>
+      </div>
 
-    <div class="flex flex-col gap-2 sm:flex-row">
-      <select id="service" class="border rounded-xl px-3 py-2 bg-white">
+      <div class="flex flex-col gap-2 sm:flex-row">
+      <a href="/admin" class="rounded-xl px-4 py-2 border border-slate-300 bg-white text-slate-700 text-center">
+        Админка
+      </a>
+
+      <select id="service" class="rounded-xl border border-white/10 bg-white/95 px-3 py-2 text-slate-900">
         <option value="rpp">RPP</option>
         <option value="farma">Farma</option>
       </select>
 
-      <select id="period" class="border rounded-xl px-3 py-2 bg-white">
+      <select id="period" class="rounded-xl border border-white/10 bg-white/95 px-3 py-2 text-slate-900">
         <option value="day">day</option>
         <option value="week">week</option>
         <option value="month">month</option>
       </select>
 
-      <button id="reload" class="rounded-xl px-4 py-2 bg-slate-900 text-white">
+      <button id="reload" class="rounded-xl px-4 py-2 bg-sky-400 text-slate-950 font-semibold">
         Обновить
       </button>
+      </div>
     </div>
-  </div>
+
+    <div class="mt-6 grid gap-4 md:grid-cols-3">
+      <div class="rounded-3xl border border-white/10 bg-white/10 p-4">
+        <div class="text-xs uppercase tracking-[0.24em] text-slate-300">Service Snapshot</div>
+        <div id="hero-service" class="mt-3 text-2xl font-semibold">RPP</div>
+        <div id="hero-period" class="mt-1 text-sm text-slate-300">day</div>
+      </div>
+      <div class="rounded-3xl border border-white/10 bg-white/10 p-4">
+        <div class="text-xs uppercase tracking-[0.24em] text-slate-300">Revenue Pulse</div>
+        <div id="hero-revenue" class="mt-3 text-2xl font-semibold">-</div>
+        <div id="hero-conversion" class="mt-1 text-sm text-slate-300">-</div>
+      </div>
+      <div class="rounded-3xl border border-sky-300/25 bg-sky-400/10 p-4">
+        <div class="text-xs uppercase tracking-[0.24em] text-sky-100/80">Revenue From DB</div>
+        <div id="hero-db-revenue" class="mt-3 text-2xl font-semibold">-</div>
+        <div id="hero-db-share" class="mt-1 text-sm text-sky-100/80">-</div>
+      </div>
+    </div>
+  </section>
 
   <div id="error" class="hidden mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
 
@@ -70,29 +93,37 @@
     </div>
 
     <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <div class="rounded-2xl border border-emerald-200 bg-white p-4">
-        <div class="text-sm text-slate-500">Клики оплаты</div>
-        <div id="payment_clicks_count" class="mt-2 text-3xl font-bold text-slate-900">-</div>
+      <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+        <div class="text-sm text-sky-900/70">Успешные оплаты из базы</div>
+        <div id="matched_successful_payments_count" class="mt-2 text-3xl font-bold text-sky-950">-</div>
+        <div class="mt-1 text-xs text-sky-900/60">Только пользователи, которых удалось сматчить с ботом</div>
       </div>
-      <div class="rounded-2xl border border-emerald-200 bg-white p-4">
-        <div class="text-sm text-slate-500">Успешные оплаты</div>
-        <div id="successful_payments_count" class="mt-2 text-3xl font-bold text-slate-900">-</div>
+      <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+        <div class="text-sm text-sky-900/70">Выручка из базы</div>
+        <div id="matched_revenue_sum" class="mt-2 text-3xl font-bold text-sky-950">-</div>
+        <div class="mt-1 text-xs text-sky-900/60">Деньги только от пользователей, которые есть в локальной БД</div>
       </div>
       <div class="rounded-2xl border border-emerald-200 bg-white p-4">
         <div class="text-sm text-slate-500">Платящие пользователи</div>
+        <div class="mt-1 text-xs text-slate-400">Все уникальные пользователи с успешной оплатой: и из базы, и внешние</div>
         <div id="paid_users_count" class="mt-2 text-3xl font-bold text-slate-900">-</div>
-      </div>
-      <div class="rounded-2xl border border-emerald-200 bg-white p-4">
-        <div class="text-sm text-slate-500">Выручка</div>
-        <div id="revenue_sum" class="mt-2 text-3xl font-bold text-slate-900">-</div>
       </div>
       <div class="rounded-2xl border border-emerald-200 bg-white p-4">
         <div class="text-sm text-slate-500">Средний платеж</div>
         <div id="avg_payment_amount" class="mt-2 text-2xl font-bold text-slate-900">-</div>
       </div>
       <div class="rounded-2xl border border-emerald-200 bg-white p-4">
-        <div class="text-sm text-slate-500">ARPPU</div>
-        <div id="arppu" class="mt-2 text-2xl font-bold text-slate-900">-</div>
+        <div class="text-sm text-slate-500">Выручка</div>
+        <div id="revenue_sum" class="mt-2 text-3xl font-bold text-slate-900">-</div>
+      </div>
+      <div class="rounded-2xl border border-emerald-200 bg-white p-4">
+        <div class="text-sm text-slate-500">Успешные оплаты</div>
+        <div class="mt-1 text-xs text-slate-400">Все успешные платежные события из листов, даже если пользователь не найден в базе</div>
+        <div id="successful_payments_count" class="mt-2 text-3xl font-bold text-slate-900">-</div>
+      </div>
+      <div class="rounded-2xl border border-emerald-200 bg-white p-4">
+        <div class="text-sm text-slate-500">Клики оплаты</div>
+        <div id="payment_clicks_count" class="mt-2 text-3xl font-bold text-slate-900">-</div>
       </div>
       <div class="rounded-2xl border border-emerald-200 bg-white p-4">
         <div class="text-sm text-slate-500">Конверсия click -> success</div>
@@ -103,20 +134,61 @@
         <div id="unmatched_events_count" class="mt-2 text-2xl font-bold text-amber-950">-</div>
       </div>
     </div>
+
+    <div class="mt-5 grid gap-4 xl:grid-cols-3">
+      <div class="rounded-2xl border border-sky-200 bg-white p-4">
+        <div class="text-xs uppercase tracking-[0.22em] text-slate-400">Conversion Gap</div>
+        <div id="insight-conversion-gap" class="mt-3 text-xl font-semibold text-slate-950">-</div>
+        <p class="mt-2 text-sm text-slate-500">Сколько кликов не дошло до успешной оплаты.</p>
+      </div>
+      <div class="rounded-2xl border border-violet-200 bg-white p-4">
+        <div class="text-xs uppercase tracking-[0.22em] text-slate-400">Top Source</div>
+        <div id="insight-top-source" class="mt-3 text-xl font-semibold text-slate-950">-</div>
+        <p class="mt-2 text-sm text-slate-500">Лист с максимальной выручкой в текущем окне.</p>
+      </div>
+      <div class="rounded-2xl border border-amber-200 bg-white p-4">
+        <div class="text-xs uppercase tracking-[0.22em] text-slate-400">Data Quality</div>
+        <div id="insight-data-quality" class="mt-3 text-xl font-semibold text-slate-950">-</div>
+        <p class="mt-2 text-sm text-slate-500">Качество матчинга платежных событий с пользователями.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold">Последние успешные оплаты из базы</h2>
+        <p class="text-sm text-slate-500">Только оплаты пользователей, которых удалось сопоставить с локальной базой.</p>
+      </div>
+      <button id="toggle-recent-payments" data-expanded="false" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-950 hover:text-slate-950">Показать все</button>
+    </div>
+
+    <div class="mt-5 max-h-[520px] overflow-auto rounded-2xl border border-slate-200">
+      <table class="min-w-full text-sm">
+        <thead class="sticky top-0 bg-slate-100 text-slate-700">
+          <tr>
+            <th class="p-3 text-left">Дата оплаты</th>
+            <th class="p-3 text-left">Сумма</th>
+            <th class="p-3 text-left">Никнейм / имя</th>
+            <th class="p-3 text-left">Источник</th>
+          </tr>
+        </thead>
+        <tbody id="recent-payments-items" class="divide-y"></tbody>
+      </table>
+    </div>
   </section>
 
   <section class="mt-6 rounded-3xl bg-white p-5 shadow-sm border border-slate-200">
     <div class="flex items-center justify-between gap-3">
       <div>
         <h2 class="text-xl font-semibold">Динамика оплат</h2>
-        <p class="text-sm text-slate-500">Clicks, success, revenue и платящие пользователи по периоду</p>
       </div>
       <p id="payments-timeseries-status" class="text-sm text-slate-500">Ожидание загрузки</p>
     </div>
 
-    <div class="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+    <div class="mt-5 max-h-[420px] overflow-auto rounded-2xl border border-slate-200">
       <table class="min-w-full text-sm">
-        <thead class="bg-slate-100 text-slate-700">
+        <thead class="sticky top-0 bg-slate-100 text-slate-700">
           <tr>
             <th class="p-3 text-left">Период</th>
             <th class="p-3 text-left">Clicks</th>
@@ -264,13 +336,17 @@
       <p id="utm-status" class="text-sm text-slate-500">Ожидание загрузки</p>
     </div>
 
-    <div class="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <div class="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.9fr)]">
       <div class="overflow-x-auto rounded-2xl border border-slate-200">
         <table class="min-w-full text-sm">
           <thead class="bg-slate-100 text-slate-700">
             <tr>
               <th class="p-3 text-left">UTM метка</th>
               <th class="p-3 text-left">Пользователи</th>
+              <th class="p-3 text-left">Платящие</th>
+              <th class="p-3 text-left">Получили файл</th>
+              <th class="p-3 text-left">Выручка</th>
+              <th class="p-3 text-left">Конверсия в оплату</th>
             </tr>
           </thead>
           <tbody id="utm-marks" class="divide-y"></tbody>
@@ -332,6 +408,8 @@
 <script>
 const el = (id) => document.getElementById(id);
 let currentRequestId = 0;
+let expandedRecentPaymentUserId = null;
+let expandedRecentPaymentDetailRow = null;
 
 function fmt(value) {
   if (value === null || value === undefined) return "-";
@@ -358,6 +436,11 @@ function fmtMoney(value) {
 function fmtPct(value) {
   if (value === null || value === undefined) return "-";
   return `${value}%`;
+}
+
+function pctOf(part, whole) {
+  if (!whole) return null;
+  return Math.round((part / whole) * 100);
 }
 
 function fmtDate(value) {
@@ -413,9 +496,19 @@ function clearError() {
   node.classList.add("hidden");
 }
 
+function clearRecentPaymentDetail() {
+  if (expandedRecentPaymentDetailRow) {
+    expandedRecentPaymentDetailRow.remove();
+    expandedRecentPaymentDetailRow = null;
+  }
+  expandedRecentPaymentUserId = null;
+}
+
 function buildUrl(path, service, period) {
-  const params = new URLSearchParams({ service, period });
-  return `${path}?${params.toString()}`;
+  const url = new URL(path, window.location.origin);
+  url.searchParams.set("service", service);
+  url.searchParams.set("period", period);
+  return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
 async function fetchSection(path, section, service, period, requestId) {
@@ -452,10 +545,22 @@ function resetTables() {
   el("successful_payments_count").textContent = "-";
   el("paid_users_count").textContent = "-";
   el("revenue_sum").textContent = "-";
+  el("matched_successful_payments_count").textContent = "-";
+  el("matched_revenue_sum").textContent = "-";
   el("avg_payment_amount").textContent = "-";
-  el("arppu").textContent = "-";
   el("click_to_success_conversion").textContent = "-";
   el("unmatched_events_count").textContent = "-";
+  el("hero-service").textContent = el("service").value.toUpperCase();
+  el("hero-period").textContent = el("period").value;
+  el("hero-revenue").textContent = "-";
+  el("hero-conversion").textContent = "-";
+  el("hero-db-revenue").textContent = "-";
+  el("hero-db-share").textContent = "-";
+  el("insight-conversion-gap").textContent = "-";
+  el("insight-top-source").textContent = "-";
+  el("insight-data-quality").textContent = "-";
+  el("recent-payments-items").innerHTML = "";
+  el("toggle-recent-payments").textContent = el("toggle-recent-payments").dataset.expanded === "true" ? "Показать меньше" : "Показать все";
   el("audience-section").classList.remove("hidden");
 
   for (const section of [
@@ -488,15 +593,139 @@ async function loadPaymentsOverview(service, period, requestId) {
   el("successful_payments_count").textContent = fmt(data.successful_payments_count);
   el("paid_users_count").textContent = fmt(data.paid_users_count);
   el("revenue_sum").textContent = fmtMoney(data.revenue_sum);
+  el("matched_successful_payments_count").textContent = fmt(data.matched_successful_payments_count);
+  el("matched_revenue_sum").textContent = fmtMoney(data.matched_revenue_sum);
   el("avg_payment_amount").textContent = fmtMoney(data.avg_payment_amount);
-  el("arppu").textContent = fmtMoney(data.arppu);
   el("click_to_success_conversion").textContent = fmtPct(data.click_to_success_conversion);
   el("unmatched_events_count").textContent = fmt(data.unmatched_events_count);
+  el("hero-service").textContent = service.toUpperCase();
+  el("hero-period").textContent = period;
+  el("hero-revenue").textContent = fmtMoney(data.revenue_sum);
+  el("hero-conversion").textContent = `Conversion ${fmtPct(data.click_to_success_conversion)}`;
+  const matchedRevenueShare = pctOf(data.matched_revenue_sum || 0, data.revenue_sum || 0);
+  el("hero-db-revenue").textContent = fmtMoney(data.matched_revenue_sum);
+  el("hero-db-share").textContent = matchedRevenueShare === null ? "Нет данных" : `${matchedRevenueShare}% выручки из базы`;
+  const failedClicks = Math.max((data.payment_clicks_count || 0) - (data.successful_payments_count || 0), 0);
+  el("insight-conversion-gap").textContent = failedClicks ? `${fmt(failedClicks)} кликов без success` : "Разрыв минимальный";
+  const quality = pctOf(
+    Math.max((data.successful_payments_count || 0) + (data.payment_clicks_count || 0) - (data.unmatched_events_count || 0), 0),
+    Math.max((data.successful_payments_count || 0) + (data.payment_clicks_count || 0), 0),
+  );
+  el("insight-data-quality").textContent = quality === null
+    ? "Нет данных"
+    : matchedRevenueShare === null
+      ? `${quality}% matched`
+      : `${quality}% matched • ${matchedRevenueShare}% выручки из базы`;
+}
+
+async function loadRecentPayments(service, period, requestId) {
+  const expanded = el("toggle-recent-payments").dataset.expanded === "true";
+  const limit = expanded ? 100 : 10;
+  const data = await fetchSection(`/api/analytics/payments/recent?limit=${limit}`, "payments-sources", service, period, requestId);
+
+  if (!data.items || !data.items.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td colspan="4" class="p-4 text-center text-slate-500">Успешных оплат пока нет</td>
+    `;
+    el("recent-payments-items").appendChild(tr);
+    return;
+  }
+
+  for (const item of data.items) {
+    const displayName = item.nickname || item.full_name || item.email || "-";
+    const tr = document.createElement("tr");
+    tr.className = "cursor-pointer transition hover:bg-slate-50";
+    tr.dataset.userId = String(item.matched_user_tg_id || "");
+    tr.innerHTML = `
+      <td class="p-3">${escapeHtml(fmtDate(item.event_date))}</td>
+      <td class="p-3 font-medium">${fmtMoney(item.amount)}</td>
+      <td class="p-3">
+        <div class="font-medium">${escapeHtml(displayName)}</div>
+        <div class="text-xs text-slate-500">${escapeHtml(item.matched_user_tg_id ? `id ${String(item.matched_user_tg_id)}` : (item.full_name || item.email || ""))}</div>
+      </td>
+      <td class="p-3">${escapeHtml(item.source_sheet_name || "-")}</td>
+    `;
+    tr.addEventListener("click", () => toggleRecentPaymentDetail(service, item.matched_user_tg_id, tr));
+    el("recent-payments-items").appendChild(tr);
+  }
+}
+
+function renderPaymentUserDetail(data) {
+  const completedSteps = (data.steps || []).filter((step) => step.completed_at);
+  const stepsHtml = completedSteps.length
+    ? completedSteps.map((step) => `
+        <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div class="text-sm font-medium text-slate-900">${escapeHtml(step.label)}</div>
+          <div class="mt-1 text-xs text-slate-500">${escapeHtml(fmtDate(step.completed_at))}</div>
+        </div>
+      `).join("")
+    : '<div class="text-sm text-slate-500">Нет зафиксированных шагов</div>';
+
+  return `
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span class="rounded-full border border-slate-200 bg-white px-3 py-1">username: ${escapeHtml(data.username || "-")}</span>
+        <span class="rounded-full border border-slate-200 bg-white px-3 py-1">tg_id: ${escapeHtml(String(data.matched_user_tg_id || "-"))}</span>
+        <span class="rounded-full border border-slate-200 bg-white px-3 py-1">join date: ${escapeHtml(fmtDate(data.join_date))}</span>
+        <span class="rounded-full border border-slate-200 bg-white px-3 py-1">utm: ${escapeHtml(data.utm_mark || "-")}</span>
+      </div>
+      <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">${stepsHtml}</div>
+    </div>
+  `;
+}
+
+async function toggleRecentPaymentDetail(service, matchedUserTgId, triggerRow) {
+  if (!matchedUserTgId) return;
+
+  if (expandedRecentPaymentUserId === matchedUserTgId) {
+    clearRecentPaymentDetail();
+    return;
+  }
+
+  clearRecentPaymentDetail();
+
+  const detailRow = document.createElement("tr");
+  detailRow.className = "bg-slate-50/70";
+  detailRow.innerHTML = `
+    <td colspan="4" class="p-4 text-sm text-slate-500">Загрузка истории пользователя...</td>
+  `;
+  triggerRow.insertAdjacentElement("afterend", detailRow);
+  expandedRecentPaymentDetailRow = detailRow;
+  expandedRecentPaymentUserId = matchedUserTgId;
+
+  try {
+    const url = new URL("/api/analytics/payments/user-detail", window.location.origin);
+    url.searchParams.set("service", service);
+    url.searchParams.set("matched_user_tg_id", String(matchedUserTgId));
+    const response = await fetch(`${url.pathname}?${url.searchParams.toString()}`);
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`${response.status}: ${body}`);
+    }
+
+    const data = await response.json();
+    if (expandedRecentPaymentUserId !== matchedUserTgId || expandedRecentPaymentDetailRow !== detailRow) {
+      return;
+    }
+
+    detailRow.innerHTML = `
+      <td colspan="4" class="p-4">${renderPaymentUserDetail(data)}</td>
+    `;
+  } catch (error) {
+    if (expandedRecentPaymentUserId !== matchedUserTgId || expandedRecentPaymentDetailRow !== detailRow) {
+      return;
+    }
+    detailRow.innerHTML = `
+      <td colspan="4" class="p-4 text-sm text-red-600">Не удалось загрузить историю: ${escapeHtml(error.message || String(error))}</td>
+    `;
+  }
 }
 
 async function loadPaymentsTimeseries(service, period, requestId) {
   const data = await fetchSection("/api/analytics/payments/timeseries", "payments-timeseries", service, period, requestId);
-  for (const item of data.items || []) {
+  const items = (data.items || []).slice(-20);
+  for (const item of items) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="p-3">${escapeHtml(fmtPeriod(item.period))}</td>
@@ -511,7 +740,10 @@ async function loadPaymentsTimeseries(service, period, requestId) {
 
 async function loadPaymentsSources(service, period, requestId) {
   const data = await fetchSection("/api/analytics/payments/sources", "payments-sources", service, period, requestId);
+  const topSource = [...(data.items || [])].sort((a, b) => (b.revenue_sum || 0) - (a.revenue_sum || 0))[0];
+  el("insight-top-source").textContent = topSource ? `${topSource.sheet_name} • ${fmtMoney(topSource.revenue_sum)}` : "Нет активного лидера";
   for (const item of data.items || []) {
+    const sourceConversion = pctOf(item.successful_payments_count, item.payment_clicks_count);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="p-3">
@@ -525,7 +757,7 @@ async function loadPaymentsSources(service, period, requestId) {
       <td class="p-3">${fmt(item.unmatched_events_count)}</td>
       <td class="p-3">
         <div>${escapeHtml(item.last_sync_status || "-")}</div>
-        <div class="text-xs text-slate-500">${item.is_active ? "active" : "inactive"}</div>
+        <div class="text-xs text-slate-500">${item.is_active ? "active" : "inactive"} • conv ${escapeHtml(fmtPct(sourceConversion))}</div>
       </td>
       <td class="p-3">
         <div>${escapeHtml(fmtDate(item.last_sync_finished_at))}</div>
@@ -602,10 +834,15 @@ async function loadContent(service, period, requestId) {
 async function loadUtm(service, period, requestId) {
   const data = await fetchSection("/api/analytics/utm", "utm", service, period, requestId);
   for (const item of data.marks || []) {
+    const fileReceivedPct = pctOf(item.file_received_users, item.users);
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="p-3">${escapeHtml(item.utm_mark)}</td>
+      <td class="p-3 font-medium">${escapeHtml(item.utm_mark)}</td>
       <td class="p-3">${fmt(item.users)}</td>
+      <td class="p-3">${fmt(item.paid_users)}</td>
+      <td class="p-3">${fmt(item.file_received_users)}${fileReceivedPct === null ? "" : ` / ${fileReceivedPct}%`}</td>
+      <td class="p-3">${fmtMoney(item.revenue_sum)}</td>
+      <td class="p-3">${escapeHtml(fmtPct(item.conversion_to_payment))}</td>
     `;
     el("utm-marks").appendChild(tr);
   }
@@ -661,6 +898,7 @@ async function loadDashboard() {
     { section: "payments-overview", run: loadPaymentsOverview },
     { section: "payments-timeseries", run: loadPaymentsTimeseries },
     { section: "payments-sources", run: loadPaymentsSources },
+    { section: "payments-sources", run: loadRecentPayments },
     { section: "funnel", run: loadFunnel },
     { section: "audience", run: loadAudience },
     { section: "content", run: loadContent },
@@ -683,6 +921,12 @@ async function loadDashboard() {
 }
 
 el("reload").addEventListener("click", loadDashboard);
+el("toggle-recent-payments").addEventListener("click", () => {
+  const expanded = el("toggle-recent-payments").dataset.expanded === "true";
+  el("toggle-recent-payments").dataset.expanded = expanded ? "false" : "true";
+  el("toggle-recent-payments").textContent = expanded ? "Показать все" : "Показать меньше";
+  loadDashboard();
+});
 loadDashboard();
 </script>
 {% endblock %}

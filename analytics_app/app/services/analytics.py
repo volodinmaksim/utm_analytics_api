@@ -22,7 +22,13 @@ from analytics_app.app.models.dto import (
     PaymentSourcesResponse,
     PaymentTimeseriesResponse,
     PaymentTimeseriesRow,
+    PaymentUserDetailResponse,
+    PaymentUserFeedbackRow,
+    PaymentUserHistoryPaymentRow,
+    PaymentUserStepRow,
     Period,
+    RecentPaymentRow,
+    RecentPaymentsResponse,
     Service,
     UTMResponse,
     UtmMarkRow,
@@ -328,7 +334,7 @@ async def get_utm(
     session: AsyncSession, service: Service, period: Period
 ) -> UTMResponse:
     async def loader(session: AsyncSession) -> UTMResponse:
-        marks = await _exec_all(session, queries.utm_marks(service))
+        marks = await _exec_all(session, queries.utm_payment_efficiency(service))
         timeseries = await _exec_all(session, queries.utm_timeseries(service, period))
         return UTMResponse(
             service=service,
@@ -337,6 +343,13 @@ async def get_utm(
                 UtmMarkRow(
                     utm_mark=str(item.get("utm_mark") or ""),
                     users=int(item.get("users", 0) or 0),
+                    paid_users=int(item.get("paid_users", 0) or 0),
+                    file_received_users=int(item.get("file_received_users", 0) or 0),
+                    revenue_sum=round(_to_float(item.get("revenue_sum")), 2),
+                    conversion_to_payment=_pct(
+                        int(item.get("paid_users", 0) or 0),
+                        int(item.get("users", 0) or 0),
+                    ),
                 )
                 for item in marks
             ],
@@ -415,7 +428,12 @@ async def get_payment_overview(
         payment_clicks_count = int(raw.get("payment_clicks_count", 0) or 0)
         successful_payments_count = int(raw.get("successful_payments_count", 0) or 0)
         paid_users_count = int(raw.get("paid_users_count", 0) or 0)
+        matched_successful_payments_count = int(
+            raw.get("matched_successful_payments_count", 0) or 0
+        )
+        matched_paid_users_count = int(raw.get("matched_paid_users_count", 0) or 0)
         revenue_sum = _to_float(raw.get("revenue_sum"))
+        matched_revenue_sum = _to_float(raw.get("matched_revenue_sum"))
         avg_payment_amount = _to_optional_float(raw.get("avg_payment_amount"))
         arppu = None
         if paid_users_count > 0:
@@ -427,7 +445,10 @@ async def get_payment_overview(
             payment_clicks_count=payment_clicks_count,
             successful_payments_count=successful_payments_count,
             paid_users_count=paid_users_count,
+            matched_successful_payments_count=matched_successful_payments_count,
+            matched_paid_users_count=matched_paid_users_count,
             revenue_sum=round(revenue_sum, 2),
+            matched_revenue_sum=round(matched_revenue_sum, 2),
             avg_payment_amount=(
                 round(avg_payment_amount, 2)
                 if avg_payment_amount is not None
@@ -454,7 +475,10 @@ async def get_payment_overview(
             payment_clicks_count=0,
             successful_payments_count=0,
             paid_users_count=0,
+            matched_successful_payments_count=0,
+            matched_paid_users_count=0,
             revenue_sum=0.0,
+            matched_revenue_sum=0.0,
             avg_payment_amount=None,
             arppu=None,
             click_to_success_conversion=None,
@@ -548,4 +572,119 @@ async def get_payment_sources(
             period=period,
             items=[],
         ),
+    )
+
+
+
+async def get_payment_user_detail(
+    session: AsyncSession,
+    service: Service,
+    matched_user_tg_id: int,
+) -> PaymentUserDetailResponse:
+    async def loader(session: AsyncSession) -> PaymentUserDetailResponse:
+        profile = await _exec_one(
+            session,
+            queries.payment_user_profile(service, matched_user_tg_id),
+        )
+        if not profile:
+            raise ValueError("User not found in local database")
+
+        step_definitions = (
+            RPP_FUNNEL_EVENTS if service == Service.RPP else FARMA_FUNNEL_EVENTS
+        )
+        step_rows = await _exec_all(
+            session,
+            queries.payment_user_step_events(
+                service,
+                matched_user_tg_id,
+                tuple(event_name for _, event_name in step_definitions),
+            ),
+        )
+        step_map = {
+            str(item.get("event_name") or ""): item.get("completed_at")
+            for item in step_rows
+        }
+
+        feedback_rows = await _exec_all(
+            session,
+            queries.payment_user_feedback(service, matched_user_tg_id),
+        )
+        payment_rows = await _exec_all(
+            session,
+            queries.payment_user_payments(service, matched_user_tg_id),
+        )
+
+        return PaymentUserDetailResponse(
+            service=service,
+            matched_user_tg_id=matched_user_tg_id,
+            username=profile.get("username"),
+            join_date=profile.get("join_date"),
+            utm_mark=profile.get("utm_mark"),
+            steps=[
+                PaymentUserStepRow(
+                    key=key,
+                    label=FUNNEL_LABELS.get(key, key),
+                    completed_at=step_map.get(event_name),
+                )
+                for key, event_name in step_definitions
+            ],
+            feedback=[
+                PaymentUserFeedbackRow(
+                    timestamp=item.get("timestamp"),
+                    post_id=str(item.get("post_id") or ""),
+                    vote=str(item.get("vote") or ""),
+                )
+                for item in feedback_rows
+            ],
+            payments=[
+                PaymentUserHistoryPaymentRow(
+                    event_date=item.get("event_date"),
+                    amount=round(_to_float(item.get("amount")), 2),
+                    source_sheet_name=str(item.get("source_sheet_name") or ""),
+                )
+                for item in payment_rows
+            ],
+        )
+
+    return await _cached_section(
+        f"payment_user_detail_{matched_user_tg_id}",
+        service,
+        Period.DAY,
+        session,
+        loader,
+        PaymentUserDetailResponse,
+    )
+
+
+async def get_recent_payments(
+    session: AsyncSession,
+    service: Service,
+    limit: int = 10,
+) -> RecentPaymentsResponse:
+    async def loader(session: AsyncSession) -> RecentPaymentsResponse:
+        rows = await _exec_all(session, queries.recent_payments(service, limit))
+        return RecentPaymentsResponse(
+            service=service,
+            items=[
+                RecentPaymentRow(
+                    event_date=item.get("event_date"),
+                    amount=round(_to_float(item.get("amount")), 2),
+                    nickname=item.get("nickname"),
+                    full_name=item.get("full_name"),
+                    email=item.get("email"),
+                    matched_user_tg_id=item.get("matched_user_tg_id"),
+                    source_sheet_name=str(item.get("source_sheet_name") or ""),
+                )
+                for item in rows
+            ],
+        )
+
+    return await _cached_section(
+        f"recent_payments_{limit}",
+        service,
+        Period.DAY,
+        session,
+        loader,
+        RecentPaymentsResponse,
+        fallback=lambda: RecentPaymentsResponse(service=service, items=[]),
     )

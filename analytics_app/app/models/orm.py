@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
@@ -36,6 +36,10 @@ class SyncStatus(str, Enum):
     RUNNING = "running"
     OK = "ok"
     ERROR = "error"
+
+
+def _enum_values(enum_cls: type[Enum]) -> list[str]:
+    return [member.value for member in enum_cls]
 
 
 class FarmaUser(Base):
@@ -123,7 +127,12 @@ class TrackedSheet(Base):
     )
 
     service: Mapped[ServiceType] = mapped_column(
-        SqlEnum(ServiceType, name="service_type", native_enum=False),
+        SqlEnum(
+            ServiceType,
+            name="service_type",
+            native_enum=False,
+            values_callable=_enum_values,
+        ),
         nullable=False,
     )
     spreadsheet_id: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -151,7 +160,12 @@ class TrackedSheet(Base):
         nullable=True,
     )
     last_sync_status: Mapped[SyncStatus | None] = mapped_column(
-        SqlEnum(SyncStatus, name="sync_status", native_enum=False),
+        SqlEnum(
+            SyncStatus,
+            name="sync_status",
+            native_enum=False,
+            values_callable=_enum_values,
+        ),
         nullable=True,
     )
     last_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -174,6 +188,8 @@ class TrackedSheet(Base):
 
     payment_events: Mapped[list["PaymentEvent"]] = relationship(
         back_populates="tracked_sheet",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -200,11 +216,16 @@ class PaymentEvent(Base):
     )
 
     service: Mapped[ServiceType] = mapped_column(
-        SqlEnum(ServiceType, name="service_type", native_enum=False),
+        SqlEnum(
+            ServiceType,
+            name="service_type",
+            native_enum=False,
+            values_callable=_enum_values,
+        ),
         nullable=False,
     )
     tracked_sheet_id: Mapped[int] = mapped_column(
-        ForeignKey("tracked_sheets.id"),
+        ForeignKey("tracked_sheets.id", ondelete="CASCADE"),
         nullable=False,
     )
     source_sheet_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -219,7 +240,12 @@ class PaymentEvent(Base):
         nullable=True,
     )
     event_type: Mapped[PaymentEventType] = mapped_column(
-        SqlEnum(PaymentEventType, name="payment_event_type", native_enum=False),
+        SqlEnum(
+            PaymentEventType,
+            name="payment_event_type",
+            native_enum=False,
+            values_callable=_enum_values,
+        ),
         nullable=False,
     )
     amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
