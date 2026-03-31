@@ -51,40 +51,78 @@ RPP_FUNNEL_EVENTS = (
 
 FARMA_FUNNEL_EVENTS = (("file_received", settings.FARMA_FILE_EVENT),)
 
-FUNNEL_LABELS = {
-    "registered": "Пользователи в базе",
-    "file_received": "Получили файл",
-    "survey_15min_sent": "Получили 15-минутный опрос",
-    "continue_yes": "Согласились продолжить",
-    "reviews_opened": "Открыли отзывы",
-    "wish_submitted": "Отправили пожелание",
+SFBT_FUNNEL_EVENTS = (
+    ("file_received", settings.SFBT_FILE_EVENT),
+    ("after_link_yes", "after_link_yes"),
+    ("after_link_yes_initial_sent", "after_link_yes_initial_sent"),
+    ("after_link_yes_delay_1_sent", "after_link_yes_delay_1_sent"),
+    ("after_link_yes_delay_2_sent", "after_link_yes_delay_2_sent"),
+    ("after_link_yes_day_1_sent", "after_link_yes_day_1_sent"),
+    ("after_link_yes_day_2_sent", "after_link_yes_day_2_sent"),
+)
+
+SERVICE_FUNNEL_EVENTS = {
+    Service.RPP: RPP_FUNNEL_EVENTS,
+    Service.FARMA: FARMA_FUNNEL_EVENTS,
+    Service.SFBT: SFBT_FUNNEL_EVENTS,
 }
 
-CONTENT_EVENT_LABELS = {
-    "survey_15min_sent": "15-минутный опрос отправлен",
-    "extra_yes": "Продолжить: да",
-    "extra_no": "Продолжить: нет",
-    "post_sent_1beg": "Beginner: пост 1",
-    "post_sent_2beg": "Beginner: пост 2",
-    "post_sent_3beg": "Beginner: пост 3",
-    "post_sent_4beg": "Beginner: пост 4",
-    "post_sent_5beg": "Beginner: пост 5",
-    "post_sent_6beg": "Beginner: пост 6",
-    "post_sent_7beg": "Beginner: пост 7",
-    "post_sent_8beg": "Beginner: пост 8",
-    "post_sent_7pro": "Pro: пост 7",
-    "post_sent_8pro": "Pro: пост 8",
-    "post_sent_9pro": "Pro: пост 9",
-    "post_sent_10pro": "Pro: пост 10",
-    "post_sent_11pro": "Pro: пост 11",
-    "post_sent_12pro": "Pro: пост 12",
-    "post_sent_final_up": "Финал вверх",
-    "post_sent_final_down": "Финал вниз",
-    "survey_yes": "Ответ на survey: да",
-    "survey_no": "Ответ на survey: нет",
-    "decided_continue": "Передумали продолжить",
-    "reviews_opened": "Открыли отзывы",
-    "wish_submitted": "Отправили пожелание",
+FUNNEL_LABELS = {
+    "registered": "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438 \u0432 \u0431\u0430\u0437\u0435",
+    "file_received": "\u041f\u043e\u043b\u0443\u0447\u0438\u043b\u0438 \u0444\u0430\u0439\u043b",
+    "survey_15min_sent": "\u041f\u043e\u043b\u0443\u0447\u0438\u043b\u0438 15-\u043c\u0438\u043d\u0443\u0442\u043d\u044b\u0439 \u043e\u043f\u0440\u043e\u0441",
+    "continue_yes": "\u0421\u043e\u0433\u043b\u0430\u0441\u0438\u043b\u0438\u0441\u044c \u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c",
+    "reviews_opened": "\u041e\u0442\u043a\u0440\u044b\u043b\u0438 \u043e\u0442\u0437\u044b\u0432\u044b",
+    "wish_submitted": "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u043b\u0438 \u043f\u043e\u0436\u0435\u043b\u0430\u043d\u0438\u0435",
+    "after_link_yes": "\u041d\u0430\u0436\u0430\u043b\u0438 \"\u0414\u0430\" \u043f\u043e\u0441\u043b\u0435 \u0441\u0441\u044b\u043b\u043a\u0438",
+    "after_link_yes_initial_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430 \u043f\u0435\u0440\u0432\u0430\u044f \u0441\u0435\u0440\u0438\u044f \u043f\u043e\u0441\u043b\u0435 \"\u0414\u0430\"",
+    "after_link_yes_delay_1_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d follow-up 1",
+    "after_link_yes_delay_2_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d follow-up 2",
+    "after_link_yes_day_1_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d day 1",
+    "after_link_yes_day_2_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d day 2",
+}
+
+RPP_CONTENT_EVENT_LABELS = {
+    "survey_15min_sent": "15-\u043c\u0438\u043d\u0443\u0442\u043d\u044b\u0439 \u043e\u043f\u0440\u043e\u0441 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d",
+    "extra_yes": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c: \u0434\u0430",
+    "extra_no": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c: \u043d\u0435\u0442",
+    "post_sent_1beg": "Beginner: \u043f\u043e\u0441\u0442 1",
+    "post_sent_2beg": "Beginner: \u043f\u043e\u0441\u0442 2",
+    "post_sent_3beg": "Beginner: \u043f\u043e\u0441\u0442 3",
+    "post_sent_4beg": "Beginner: \u043f\u043e\u0441\u0442 4",
+    "post_sent_5beg": "Beginner: \u043f\u043e\u0441\u0442 5",
+    "post_sent_6beg": "Beginner: \u043f\u043e\u0441\u0442 6",
+    "post_sent_7beg": "Beginner: \u043f\u043e\u0441\u0442 7",
+    "post_sent_8beg": "Beginner: \u043f\u043e\u0441\u0442 8",
+    "post_sent_7pro": "Pro: \u043f\u043e\u0441\u0442 7",
+    "post_sent_8pro": "Pro: \u043f\u043e\u0441\u0442 8",
+    "post_sent_9pro": "Pro: \u043f\u043e\u0441\u0442 9",
+    "post_sent_10pro": "Pro: \u043f\u043e\u0441\u0442 10",
+    "post_sent_11pro": "Pro: \u043f\u043e\u0441\u0442 11",
+    "post_sent_12pro": "Pro: \u043f\u043e\u0441\u0442 12",
+    "post_sent_final_up": "\u0424\u0438\u043d\u0430\u043b \u0432\u0432\u0435\u0440\u0445",
+    "post_sent_final_down": "\u0424\u0438\u043d\u0430\u043b \u0432\u043d\u0438\u0437",
+    "survey_yes": "\u041e\u0442\u0432\u0435\u0442 \u043d\u0430 survey: \u0434\u0430",
+    "survey_no": "\u041e\u0442\u0432\u0435\u0442 \u043d\u0430 survey: \u043d\u0435\u0442",
+    "decided_continue": "\u041f\u0435\u0440\u0435\u0434\u0443\u043c\u0430\u043b\u0438 \u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c",
+    "reviews_opened": "\u041e\u0442\u043a\u0440\u044b\u043b\u0438 \u043e\u0442\u0437\u044b\u0432\u044b",
+    "wish_submitted": "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u043b\u0438 \u043f\u043e\u0436\u0435\u043b\u0430\u043d\u0438\u0435",
+}
+
+SFBT_CONTENT_EVENT_LABELS = {
+    "after_link_yes": "\u041d\u0430\u0436\u0430\u043b\u0438 \"\u0414\u0430\" \u043f\u043e\u0441\u043b\u0435 \u0441\u0441\u044b\u043b\u043a\u0438",
+    "after_link_no": "\u041d\u0430\u0436\u0430\u043b\u0438 \"\u041d\u0435\u0442\" \u043f\u043e\u0441\u043b\u0435 \u0441\u0441\u044b\u043b\u043a\u0438",
+    "after_link_yes_initial_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430 \u043f\u0435\u0440\u0432\u0430\u044f \u0441\u0435\u0440\u0438\u044f \u043f\u043e\u0441\u043b\u0435 \"\u0414\u0430\"",
+    "after_link_yes_delay_1_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d follow-up 1",
+    "after_link_yes_delay_2_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d follow-up 2",
+    "after_link_yes_day_1_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d day 1",
+    "after_link_yes_day_2_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d day 2",
+}
+
+SERVICE_CONTENT_EVENT_LABELS = {
+    Service.RPP: RPP_CONTENT_EVENT_LABELS,
+    Service.FARMA: {},
+    Service.SFBT: SFBT_CONTENT_EVENT_LABELS,
 }
 
 SECTION_TTLS = {
@@ -210,9 +248,7 @@ async def get_funnel(
         total_users = await _exec_one(session, queries.total_users(service))
         new_users = await _exec_all(session, queries.new_users(service, period))
 
-        step_definitions = (
-            RPP_FUNNEL_EVENTS if service == Service.RPP else FARMA_FUNNEL_EVENTS
-        )
+        step_definitions = SERVICE_FUNNEL_EVENTS[service]
         event_counts = await _exec_all(
             session,
             queries.event_user_counts(
@@ -307,14 +343,18 @@ async def get_content(
     session: AsyncSession, service: Service, period: Period
 ) -> ContentResponse:
     async def loader(session: AsyncSession) -> ContentResponse:
+        content_event_labels = SERVICE_CONTENT_EVENT_LABELS[service]
+        if not content_event_labels:
+            return ContentResponse(service=service, items=[])
+
         rows = await _exec_all(
             session,
-            queries.event_user_counts(service, tuple(CONTENT_EVENT_LABELS.keys())),
+            queries.event_user_counts(service, tuple(content_event_labels.keys())),
         )
         event_map = {row["event_name"]: int(row.get("users", 0) or 0) for row in rows}
         items = [
             ContentEventRow(key=key, label=label, users=event_map.get(key, 0))
-            for key, label in CONTENT_EVENT_LABELS.items()
+            for key, label in content_event_labels.items()
             if event_map.get(key, 0) > 0
         ]
         return ContentResponse(service=service, items=items)
@@ -589,9 +629,7 @@ async def get_payment_user_detail(
         if not profile:
             raise ValueError("User not found in local database")
 
-        step_definitions = (
-            RPP_FUNNEL_EVENTS if service == Service.RPP else FARMA_FUNNEL_EVENTS
-        )
+        step_definitions = SERVICE_FUNNEL_EVENTS[service]
         step_rows = await _exec_all(
             session,
             queries.payment_user_step_events(

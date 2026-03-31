@@ -94,6 +94,7 @@ def _payload_to_record(payload: PaymentEventPayload) -> dict[str, object]:
         'raw_payment_value': payload.raw_payment_value,
         'user_id': payload.user_id,
         'farma_user_id': payload.farma_user_id,
+        'sfbt_user_id': payload.sfbt_user_id,
         'matched_user_tg_id': payload.matched_user_tg_id,
     }
 

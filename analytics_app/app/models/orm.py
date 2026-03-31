@@ -25,6 +25,7 @@ class Base(DeclarativeBase):
 class ServiceType(str, Enum):
     RPP = "rpp"
     FARMA = "farma"
+    SFBT = "sfbt"
 
 
 class PaymentEventType(str, Enum):
@@ -113,6 +114,39 @@ class Events(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="events")
+
+
+class SfbtUser(Base):
+    __tablename__ = "sfbt_users"
+
+    tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(100))
+    join_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    utm_mark: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    events: Mapped[list["SfbtEvent"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    payment_events: Mapped[list["PaymentEvent"]] = relationship(
+        back_populates="sfbt_user",
+    )
+
+
+class SfbtEvent(Base):
+    __tablename__ = "sfbt_events"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("sfbt_users.id"), nullable=False)
+    event_name: Mapped[str] = mapped_column(Text, nullable=False)
+    timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    user: Mapped["SfbtUser"] = relationship(back_populates="events")
 
 
 class TrackedSheet(Base):
@@ -213,6 +247,11 @@ class PaymentEvent(Base):
             "farma_user_id",
             "event_date",
         ),
+        Index(
+            "ix_payment_events_sfbt_user_id_event_date",
+            "sfbt_user_id",
+            "event_date",
+        ),
     )
 
     service: Mapped[ServiceType] = mapped_column(
@@ -255,6 +294,10 @@ class PaymentEvent(Base):
         ForeignKey("farma_users.id"),
         nullable=True,
     )
+    sfbt_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sfbt_users.id"),
+        nullable=True,
+    )
     matched_user_tg_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     inserted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -267,5 +310,8 @@ class PaymentEvent(Base):
     )
     rpp_user: Mapped["User | None"] = relationship(back_populates="payment_events")
     farma_user: Mapped["FarmaUser | None"] = relationship(
+        back_populates="payment_events",
+    )
+    sfbt_user: Mapped["SfbtUser | None"] = relationship(
         back_populates="payment_events",
     )

@@ -8,6 +8,8 @@ from analytics_app.app.models.orm import (
     FarmaUser,
     PaymentEvent,
     PaymentEventType,
+    SfbtEvent,
+    SfbtUser,
     TrackedSheet,
     User,
 )
@@ -16,6 +18,27 @@ from analytics_app.app.models.orm import (
 FEEDBACK_POSITIVE_VOTES = ("like", "up")
 FEEDBACK_NEGATIVE_VOTES = ("dislike", "down")
 
+SERVICE_QUERY_CONFIG = {
+    Service.RPP: {
+        "user_model": User,
+        "event_model": Events,
+        "payment_user_fk": "user_id",
+        "file_event_name": settings.RPP_FILE_EVENT,
+    },
+    Service.FARMA: {
+        "user_model": FarmaUser,
+        "event_model": FarmaEvent,
+        "payment_user_fk": "farma_user_id",
+        "file_event_name": settings.FARMA_FILE_EVENT,
+    },
+    Service.SFBT: {
+        "user_model": SfbtUser,
+        "event_model": SfbtEvent,
+        "payment_user_fk": "sfbt_user_id",
+        "file_event_name": settings.SFBT_FILE_EVENT,
+    },
+}
+
 
 def _wish_prefixes() -> list[str]:
     prefixes = [prefix.strip() for prefix in settings.WISH_PREFIXES.split(",")]
@@ -23,7 +46,19 @@ def _wish_prefixes() -> list[str]:
 
 
 def _event_model(service: Service):
-    return Events if service == Service.RPP else FarmaEvent
+    return SERVICE_QUERY_CONFIG[service]["event_model"]
+
+
+def _user_model(service: Service):
+    return SERVICE_QUERY_CONFIG[service]["user_model"]
+
+
+def _payment_user_join_col(service: Service):
+    return getattr(PaymentEvent, SERVICE_QUERY_CONFIG[service]["payment_user_fk"])
+
+
+def _file_event_name(service: Service) -> str:
+    return str(SERVICE_QUERY_CONFIG[service]["file_event_name"])
 
 
 def _payment_identity_expr():
@@ -35,48 +70,29 @@ def _payment_period_col(period: Period):
 
 
 def _matched_payment_after_join_condition(service: Service):
-    if service == Service.RPP:
-        return (
-            PaymentEvent.user_id.is_not(None)
-            & PaymentEvent.event_date.is_not(None)
-            & exists(
-                select(1)
-                .select_from(User)
-                .where(User.id == PaymentEvent.user_id)
-                .where(User.join_date.is_not(None))
-                .where(PaymentEvent.event_date >= User.join_date)
-            )
-        )
-
+    user_model = _user_model(service)
+    join_col = _payment_user_join_col(service)
     return (
-        PaymentEvent.farma_user_id.is_not(None)
+        join_col.is_not(None)
         & PaymentEvent.event_date.is_not(None)
         & exists(
             select(1)
-            .select_from(FarmaUser)
-            .where(FarmaUser.id == PaymentEvent.farma_user_id)
-            .where(FarmaUser.join_date.is_not(None))
-            .where(PaymentEvent.event_date >= FarmaUser.join_date)
+            .select_from(user_model)
+            .where(user_model.id == join_col)
+            .where(user_model.join_date.is_not(None))
+            .where(PaymentEvent.event_date >= user_model.join_date)
         )
     )
 
 
 def total_users(service: Service):
-    if service == Service.RPP:
-        return select(func.count(User.id).label("total_users"))
-    return select(func.count(FarmaUser.id).label("total_users"))
+    user_model = _user_model(service)
+    return select(func.count(user_model.id).label("total_users"))
 
 
 def new_users(service: Service, period: Period):
-    if service == Service.RPP:
-        period_col = func.date_trunc(period.value, User.join_date).label("period")
-        return (
-            select(period_col, func.count().label("new_users"))
-            .group_by(text("period"))
-            .order_by(text("period"))
-        )
-
-    period_col = func.date_trunc(period.value, FarmaUser.join_date).label("period")
+    user_model = _user_model(service)
+    period_col = func.date_trunc(period.value, user_model.join_date).label("period")
     return (
         select(period_col, func.count().label("new_users"))
         .group_by(text("period"))
@@ -85,7 +101,7 @@ def new_users(service: Service, period: Period):
 
 
 def utm_split(service: Service):
-    col = User.utm_mark if service == Service.RPP else FarmaUser.utm_mark
+    col = _user_model(service).utm_mark
 
     with_utm = (
         func.count()
@@ -101,12 +117,9 @@ def utm_split(service: Service):
 
 
 def utm_timeseries(service: Service, period: Period):
-    if service == Service.RPP:
-        period_col = func.date_trunc(period.value, User.join_date).label("period")
-        col = User.utm_mark
-    else:
-        period_col = func.date_trunc(period.value, FarmaUser.join_date).label("period")
-        col = FarmaUser.utm_mark
+    user_model = _user_model(service)
+    period_col = func.date_trunc(period.value, user_model.join_date).label("period")
+    col = user_model.utm_mark
 
     with_utm = (
         func.count()
@@ -127,7 +140,7 @@ def utm_timeseries(service: Service, period: Period):
 
 
 def utm_marks(service: Service):
-    col = User.utm_mark if service == Service.RPP else FarmaUser.utm_mark
+    col = _user_model(service).utm_mark
     normalized_utm = func.btrim(col).label("utm_mark")
 
     return (
@@ -140,16 +153,10 @@ def utm_marks(service: Service):
 
 
 def utm_payment_efficiency(service: Service):
-    if service == Service.RPP:
-        user_model = User
-        join_col = PaymentEvent.user_id
-        event_model = Events
-        file_event_name = settings.RPP_FILE_EVENT
-    else:
-        user_model = FarmaUser
-        join_col = PaymentEvent.farma_user_id
-        event_model = FarmaEvent
-        file_event_name = settings.FARMA_FILE_EVENT
+    user_model = _user_model(service)
+    join_col = _payment_user_join_col(service)
+    event_model = _event_model(service)
+    file_event_name = _file_event_name(service)
 
     utm_col = func.btrim(user_model.utm_mark).label("utm_mark")
     success_amount = cast(PaymentEvent.amount, Numeric)
@@ -286,14 +293,14 @@ def wishes(service: Service):
 
 def file_clicks(service: Service):
     ev = _event_model(service)
-    target = settings.RPP_FILE_EVENT if service == Service.RPP else settings.FARMA_FILE_EVENT
+    target = _file_event_name(service)
 
     return select(func.count().label("clicks")).select_from(ev).where(ev.event_name == target)
 
 
 def file_clicks_timeseries(service: Service, period: Period):
     ev = _event_model(service)
-    target = settings.RPP_FILE_EVENT if service == Service.RPP else settings.FARMA_FILE_EVENT
+    target = _file_event_name(service)
     period_col = func.date_trunc(period.value, ev.timestamp).label("period")
 
     return (
@@ -448,7 +455,6 @@ def payment_sources(service: Service):
     )
 
 
-
 def recent_payments(service: Service, limit: int = 10):
     return (
         select(
@@ -470,39 +476,24 @@ def recent_payments(service: Service, limit: int = 10):
 
 
 def payment_user_profile(service: Service, matched_user_tg_id: int):
-    if service == Service.RPP:
-        return (
-            select(
-                User.username.label("username"),
-                User.tg_id.label("matched_user_tg_id"),
-                User.join_date.label("join_date"),
-                User.utm_mark.label("utm_mark"),
-            )
-            .select_from(User)
-            .where(User.tg_id == matched_user_tg_id)
-        )
-
+    user_model = _user_model(service)
     return (
         select(
-            FarmaUser.username.label("username"),
-            FarmaUser.tg_id.label("matched_user_tg_id"),
-            FarmaUser.join_date.label("join_date"),
-            FarmaUser.utm_mark.label("utm_mark"),
+            user_model.username.label("username"),
+            user_model.tg_id.label("matched_user_tg_id"),
+            user_model.join_date.label("join_date"),
+            user_model.utm_mark.label("utm_mark"),
         )
-        .select_from(FarmaUser)
-        .where(FarmaUser.tg_id == matched_user_tg_id)
+        .select_from(user_model)
+        .where(user_model.tg_id == matched_user_tg_id)
     )
 
 
 def payment_user_step_events(service: Service, matched_user_tg_id: int, event_names: tuple[str, ...]):
     ev = _event_model(service)
-
-    if service == Service.RPP:
-        user_join = ev.user_id == User.id
-        user_filter = User.tg_id == matched_user_tg_id
-    else:
-        user_join = ev.user_id == FarmaUser.id
-        user_filter = FarmaUser.tg_id == matched_user_tg_id
+    user_model = _user_model(service)
+    user_join = ev.user_id == user_model.id
+    user_filter = user_model.tg_id == matched_user_tg_id
 
     return (
         select(
@@ -510,7 +501,7 @@ def payment_user_step_events(service: Service, matched_user_tg_id: int, event_na
             func.max(ev.timestamp).label("completed_at"),
         )
         .select_from(ev)
-        .join(User if service == Service.RPP else FarmaUser, user_join)
+        .join(user_model, user_join)
         .where(user_filter)
         .where(ev.event_name.in_(event_names))
         .group_by(ev.event_name)
@@ -522,13 +513,9 @@ def payment_user_feedback(service: Service, matched_user_tg_id: int, limit: int 
     name = ev.event_name
     vote_type = func.split_part(name, "_", 2).label("vote")
     post_id = func.split_part(name, "_", 3).label("post_id")
-
-    if service == Service.RPP:
-        user_join = ev.user_id == User.id
-        user_filter = User.tg_id == matched_user_tg_id
-    else:
-        user_join = ev.user_id == FarmaUser.id
-        user_filter = FarmaUser.tg_id == matched_user_tg_id
+    user_model = _user_model(service)
+    user_join = ev.user_id == user_model.id
+    user_filter = user_model.tg_id == matched_user_tg_id
 
     return (
         select(
@@ -537,7 +524,7 @@ def payment_user_feedback(service: Service, matched_user_tg_id: int, limit: int 
             vote_type,
         )
         .select_from(ev)
-        .join(User if service == Service.RPP else FarmaUser, user_join)
+        .join(user_model, user_join)
         .where(user_filter)
         .where(name.like("feedback_%") | name.like("fb_%"))
         .where(post_id.is_not(None))

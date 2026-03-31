@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class Service(str, Enum):
     RPP = "rpp"
     FARMA = "farma"
+    SFBT = "sfbt"
 
 
 class Period(str, Enum):
