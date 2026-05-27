@@ -1,7 +1,7 @@
 from sqlalchemy import Numeric, case, cast, exists, func, select, text
 
 from analytics_app.app.db import settings
-from analytics_app.app.models.dto import Period, Service
+from analytics_app.app.schemas.analytics import Period, Service
 from analytics_app.app.models.orm import (
     Events,
     FarmaEvent,

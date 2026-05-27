@@ -2,7 +2,8 @@ import re
 from dataclasses import dataclass
 
 from analytics_app.app.clients.google_sheets import GoogleSheetsClient, get_google_sheets_client
-from analytics_app.app.models.dto import Service, TrackedSheetResponse
+from analytics_app.app.schemas.admin import TrackedSheetResponse
+from analytics_app.app.schemas.analytics import Service
 from analytics_app.app.models.orm import ServiceType, TrackedSheet
 
 _SPREADSHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")

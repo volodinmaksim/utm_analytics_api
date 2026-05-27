@@ -6,7 +6,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analytics_app.app.db import settings
-from analytics_app.app.models.dto import (
+from analytics_app.app.schemas import (
     AudienceResponse,
     AudienceRow,
     ContentEventRow,

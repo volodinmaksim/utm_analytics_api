@@ -22,7 +22,7 @@ from analytics_app.app.clients.google_sheets import (
     GoogleSheetsReadError,
 )
 from analytics_app.app.db import get_session, settings
-from analytics_app.app.models.dto import (
+from analytics_app.app.schemas import (
     AudienceResponse,
     ContentResponse,
     FeedbackResponse,
