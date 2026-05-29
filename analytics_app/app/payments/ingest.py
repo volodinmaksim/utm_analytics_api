@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from analytics_app.app.models.orm import PaymentEvent, SyncStatus, TrackedSheet
+from analytics_app.app.models import PaymentEvent, SyncStatus, TrackedSheet
 from analytics_app.app.payments.normalization import PaymentEventPayload
 
 

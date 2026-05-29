@@ -1,20 +1,41 @@
-from analytics_app.app.models.orm import (
-    Base,
+from analytics_app.app.models.base import Base
+from analytics_app.app.models.enums import (
+    BroadcastRecipientStatus,
+    BroadcastStatus,
+    PaymentEventType,
+    ServiceType,
+    SyncStatus,
+    TelegramTemplateKind,
+    TelegramTemplateStatus,
+)
+
+from analytics_app.app.models.users import (
     Events,
     FarmaEvent,
     FarmaUser,
-    PaymentEvent,
-    PaymentEventType,
-    ServiceType,
     SfbtEvent,
     SfbtUser,
-    SyncStatus,
-    TrackedSheet,
     User,
+)
+
+from analytics_app.app.models.tracked_sheets import TrackedSheet
+from analytics_app.app.models.payments import PaymentEvent
+from analytics_app.app.models.broadcasts import (
+    Broadcast,
+    BroadcastRecipient,
+    TelegramTemplate,
+    TelegramTemplateItem,
 )
 
 __all__ = [
     "Base",
+    "ServiceType",
+    "PaymentEventType",
+    "SyncStatus",
+    "TelegramTemplateKind",
+    "TelegramTemplateStatus",
+    "BroadcastStatus",
+    "BroadcastRecipientStatus",
     "User",
     "Events",
     "FarmaUser",
@@ -23,7 +44,8 @@ __all__ = [
     "SfbtEvent",
     "TrackedSheet",
     "PaymentEvent",
-    "ServiceType",
-    "PaymentEventType",
-    "SyncStatus",
+    "TelegramTemplate",
+    "TelegramTemplateItem",
+    "Broadcast",
+    "BroadcastRecipient",
 ]

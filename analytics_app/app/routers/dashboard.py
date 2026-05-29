@@ -43,7 +43,7 @@ from analytics_app.app.schemas import (
     UTMResponse,
     WishesResponse,
 )
-from analytics_app.app.models.orm import TrackedSheet
+from analytics_app.app.models import TrackedSheet
 from analytics_app.app.payments.sync import sync_tracked_sheet_by_id
 from analytics_app.app.payments.tracked_sheets import (
     normalize_spreadsheet_source,

@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from analytics_app.app.db import settings
 from analytics_app.app.clients.google_sheets import GoogleSheetRow
-from analytics_app.app.models.orm import PaymentEventType, ServiceType
+from analytics_app.app.models import PaymentEventType, ServiceType
 
 _AMOUNT_SUFFIX_RE = re.compile(r"\s*(?:\u20bd|\u0440\u0443\u0431\.?|rub)?\s*$", re.IGNORECASE)
 _DATE_FORMATS = (

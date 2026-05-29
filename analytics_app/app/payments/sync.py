@@ -11,7 +11,7 @@ from analytics_app.app.clients.google_sheets import (
     GoogleSheetsClient,
     get_google_sheets_client,
 )
-from analytics_app.app.models.orm import SyncStatus, TrackedSheet
+from analytics_app.app.models import SyncStatus, TrackedSheet
 from analytics_app.app.payments.ingest import (
     PaymentIngestResult,
     ingest_payment_events,

@@ -1,10 +1,13 @@
 import re
 from dataclasses import dataclass
 
-from analytics_app.app.clients.google_sheets import GoogleSheetsClient, get_google_sheets_client
+from analytics_app.app.clients.google_sheets import (
+    GoogleSheetsClient,
+    get_google_sheets_client,
+)
 from analytics_app.app.schemas.admin import TrackedSheetResponse
 from analytics_app.app.schemas.analytics import Service
-from analytics_app.app.models.orm import ServiceType, TrackedSheet
+from analytics_app.app.models import ServiceType, TrackedSheet
 
 _SPREADSHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
 _GID_RE = re.compile(r"[?#&]gid=(\d+)")
@@ -35,7 +38,9 @@ def normalize_spreadsheet_source(
     if not final_id:
         raise ValueError("Unable to determine spreadsheet_id")
 
-    final_url = normalized_url or f"https://docs.google.com/spreadsheets/d/{final_id}/edit"
+    final_url = (
+        normalized_url or f"https://docs.google.com/spreadsheets/d/{final_id}/edit"
+    )
     return SpreadsheetSource(
         spreadsheet_id=final_id,
         spreadsheet_url=final_url,

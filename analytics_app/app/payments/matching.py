@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from analytics_app.app.models.orm import FarmaUser, ServiceType, SfbtUser, User
+from analytics_app.app.models import FarmaUser, ServiceType, SfbtUser, User
 from analytics_app.app.payments.normalization import PaymentEventPayload
 
 
