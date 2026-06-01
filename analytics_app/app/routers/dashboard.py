@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -22,7 +22,9 @@ from analytics_app.app.clients.google_sheets import (
     GoogleSheetsReadError,
 )
 from analytics_app.app.db import get_session, settings
+from analytics_app.app.broadcasts.templates import get_list_admin_telegram_templates
 from analytics_app.app.schemas import (
+    AdminTelegramTemplateListResponse,
     AudienceResponse,
     ContentResponse,
     FeedbackResponse,
@@ -162,6 +164,18 @@ async def list_tracked_sheets(
     return TrackedSheetsListResponse(
         items=[to_tracked_sheet_response(item) for item in items]
     )
+
+
+@router.get(
+    "/api/admin/telegram-templates",
+    response_model=AdminTelegramTemplateListResponse,
+)
+async def list_telegram_templates(
+    _admin: AdminApiDep,
+    session: SessionDep,
+    limit: int = Query(default=8, ge=1, le=100),
+) -> AdminTelegramTemplateListResponse:
+    return await get_list_admin_telegram_templates(session=session, limit=limit)
 
 
 @router.post(

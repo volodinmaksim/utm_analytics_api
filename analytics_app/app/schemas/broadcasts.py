@@ -12,6 +12,11 @@ class TelegramTemplateKind(str, Enum):
     ALBUM = "album"
 
 
+class TelegramTemplateStatus(str, Enum):
+    COLLECTING = "collecting"
+    READY = "ready"
+
+
 class BroadcastStatus(str, Enum):
     SCHEDULED = "scheduled"
     SENDING = "sending"
@@ -90,3 +95,14 @@ class AdminBroadcastListResponse(BaseModel):
 class AdminBroadcastCancelResponse(BaseModel):
     id: int
     status: BroadcastStatus
+
+
+class TelegramTemplateIngestRequest(BaseModel):
+    service: Service | None = None
+    message: dict[str, Any]
+
+
+class TelegramTemplateIngestResponse(BaseModel):
+    template_id: int
+    status: TelegramTemplateStatus
+    items_count: int

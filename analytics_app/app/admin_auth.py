@@ -14,7 +14,10 @@ ADMIN_SESSION_KEY = "admin"
 
 
 def ensure_admin_auth_configured() -> None:
-    if settings.ADMIN_PASSWORD and settings.ADMIN_SESSION_SECRET:
+    if (
+        settings.ADMIN_PASSWORD.get_secret_value()
+        and settings.ADMIN_SESSION_SECRET.get_secret_value()
+    ):
         return
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -24,7 +27,7 @@ def ensure_admin_auth_configured() -> None:
 
 def verify_admin_password(password: str) -> bool:
     ensure_admin_auth_configured()
-    return secrets.compare_digest(password, settings.ADMIN_PASSWORD or "")
+    return secrets.compare_digest(password, settings.ADMIN_PASSWORD.get_secret_value())
 
 
 def is_admin_authenticated(request: Request) -> bool:
@@ -72,7 +75,7 @@ def _sign_session_token(payload: dict[str, object]) -> str:
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     encoded = base64.urlsafe_b64encode(body).decode("ascii")
     signature = hmac.new(
-        settings.ADMIN_SESSION_SECRET.encode("utf-8"),
+        settings.ADMIN_SESSION_SECRET.get_secret_value().encode("utf-8"),
         encoded.encode("ascii"),
         hashlib.sha256,
     ).hexdigest()
@@ -86,7 +89,7 @@ def _unsign_session_token(token: str) -> dict[str, object] | None:
         return None
 
     expected = hmac.new(
-        settings.ADMIN_SESSION_SECRET.encode("utf-8"),
+        settings.ADMIN_SESSION_SECRET.get_secret_value().encode("utf-8"),
         encoded.encode("ascii"),
         hashlib.sha256,
     ).hexdigest()

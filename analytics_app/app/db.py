@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -14,8 +15,10 @@ class Settings(BaseSettings):
     HOST: str
     PORT: int
     BASE_URL: str
-    ADMIN_PASSWORD: str
-    ADMIN_SESSION_SECRET: str
+    INTERNAL_SECRET_KEY: SecretStr
+    ADMIN_TELEGRAM_ID: SecretStr
+    ADMIN_PASSWORD: SecretStr
+    ADMIN_SESSION_SECRET: SecretStr
     ADMIN_SESSION_COOKIE: str
     ADMIN_SESSION_MAX_AGE: int
     GOOGLE_SHEETS_SERVICE_ACCOUNT_FILE: str | None = None
