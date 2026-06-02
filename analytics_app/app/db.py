@@ -16,7 +16,12 @@ class Settings(BaseSettings):
     PORT: int
     BASE_URL: str
     INTERNAL_SECRET_KEY: SecretStr
-    ADMIN_TELEGRAM_ID: SecretStr
+
+    ADMIN_TELEGRAM_ID: int
+    RPP_BOT_TOKEN: SecretStr
+    FARMA_BOT_TOKEN: SecretStr
+    SFBT_BOT_TOKEN: SecretStr
+
     ADMIN_PASSWORD: SecretStr
     ADMIN_SESSION_SECRET: SecretStr
     ADMIN_SESSION_COOKIE: str

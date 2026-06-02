@@ -45,9 +45,12 @@ class AdminTelegramTemplateListResponse(BaseModel):
 
 
 class AdminTelegramTemplateSendTestResponse(BaseModel):
-    ok: bool
     template_id: int
     sent_messages_count: int
+
+
+class AdminTelegramTemplateSendTestRequest(BaseModel):
+    service: Service
 
 
 class AdminBroadcastCreateRequest(BaseModel):

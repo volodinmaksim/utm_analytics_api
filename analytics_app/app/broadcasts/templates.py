@@ -9,6 +9,8 @@ from analytics_app.app.broadcasts.repository import (
     create_telegram_template_item,
     update_collecting_template_summary,
 )
+from analytics_app.app.broadcasts.sender import send_telegram_template_to_chat
+from analytics_app.app.db import settings
 from analytics_app.app.schemas import (
     AdminTelegramTemplateListResponse,
     AdminTelegramTemplateListRow,
@@ -18,6 +20,7 @@ from analytics_app.app.schemas.broadcasts import (
     TelegramTemplateIngestResponse,
     TelegramTemplateKind,
     TelegramTemplateStatus,
+    AdminTelegramTemplateSendTestResponse,
 )
 
 DEFAULT_TEMPLATES_LIMIT = 8
@@ -142,4 +145,22 @@ async def ingest_telegram_message(
         template_id=template.id,
         status=template.status,
         items_count=template.items_count,
+    )
+
+
+async def send_test_template_to_admin(
+    session: AsyncSession,
+    *,
+    template_id: int,
+    service: Service,
+) -> AdminTelegramTemplateSendTestResponse:
+    sent_messages_count = await send_telegram_template_to_chat(
+        session,
+        template_id=template_id,
+        service=service,
+        chat_id=settings.ADMIN_TELEGRAM_ID,
+    )
+    return AdminTelegramTemplateSendTestResponse(
+        template_id=template_id,
+        sent_messages_count=sent_messages_count,
     )

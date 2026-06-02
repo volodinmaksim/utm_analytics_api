@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from analytics_app.app.models import (
     TelegramTemplate,
@@ -134,3 +135,15 @@ async def mark_template_ready_if_expired(
 
     await session.flush()
     return template
+
+
+async def get_template_with_items(
+    session: AsyncSession, *, template_id: int
+) -> TelegramTemplate | None:
+    stmt = (
+        select(TelegramTemplate)
+        .where(TelegramTemplate.id == template_id)
+        .options(selectinload(TelegramTemplate.items))
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()

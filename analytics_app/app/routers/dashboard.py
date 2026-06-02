@@ -22,7 +22,10 @@ from analytics_app.app.clients.google_sheets import (
     GoogleSheetsReadError,
 )
 from analytics_app.app.db import get_session, settings
-from analytics_app.app.broadcasts.templates import get_list_admin_telegram_templates
+from analytics_app.app.broadcasts.templates import (
+    get_list_admin_telegram_templates,
+    send_test_template_to_admin,
+)
 from analytics_app.app.schemas import (
     AdminTelegramTemplateListResponse,
     AudienceResponse,
@@ -44,6 +47,7 @@ from analytics_app.app.schemas import (
     TrackedSheetUpdateRequest,
     UTMResponse,
     WishesResponse,
+    AdminTelegramTemplateSendTestResponse,
 )
 from analytics_app.app.models import TrackedSheet
 from analytics_app.app.payments.sync import sync_tracked_sheet_by_id
@@ -53,6 +57,7 @@ from analytics_app.app.payments.tracked_sheets import (
     to_tracked_sheet_response,
     validate_tracked_sheet_access,
 )
+from analytics_app.app.schemas.broadcasts import AdminTelegramTemplateSendTestRequest
 from analytics_app.app.services.analytics import (
     get_audience,
     get_content,
@@ -67,7 +72,6 @@ from analytics_app.app.services.analytics import (
     get_utm,
     get_wishes,
 )
-
 
 router = APIRouter()
 templates = Jinja2Templates(
@@ -179,6 +183,23 @@ async def list_telegram_templates(
 
 
 @router.post(
+    "/api/admin/telegram-templates/{template_id}/send-test",
+    response_model=AdminTelegramTemplateSendTestResponse,
+)
+async def check_template(
+    _admin: AdminApiDep,
+    session: SessionDep,
+    template_id: int,
+    data: AdminTelegramTemplateSendTestRequest,
+) -> AdminTelegramTemplateSendTestResponse:
+    return await send_test_template_to_admin(
+        session,
+        template_id=template_id,
+        service=data.service,
+    )
+
+
+@router.post(
     "/api/admin/tracked-sheets",
     response_model=TrackedSheetResponse,
     status_code=status.HTTP_201_CREATED,
@@ -229,7 +250,10 @@ async def create_tracked_sheet(
     except IntegrityError as exc:
         await session.rollback()
         message = str(getattr(exc, "orig", exc))
-        if "uq_tracked_sheets_spreadsheet_id_sheet_name" in message or "duplicate key value" in message:
+        if (
+            "uq_tracked_sheets_spreadsheet_id_sheet_name" in message
+            or "duplicate key value" in message
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Tracked sheet with the same spreadsheet_id and sheet_name already exists",
@@ -261,7 +285,8 @@ async def update_tracked_sheet(
         payload.spreadsheet_url is not None or payload.spreadsheet_id is not None
     )
     sheet_name_changed = (
-        payload.sheet_name is not None and payload.sheet_name != tracked_sheet.sheet_name
+        payload.sheet_name is not None
+        and payload.sheet_name != tracked_sheet.sheet_name
     )
 
     if source_changed:
@@ -314,7 +339,10 @@ async def update_tracked_sheet(
     except IntegrityError as exc:
         await session.rollback()
         message = str(getattr(exc, "orig", exc))
-        if "uq_tracked_sheets_spreadsheet_id_sheet_name" in message or "duplicate key value" in message:
+        if (
+            "uq_tracked_sheets_spreadsheet_id_sheet_name" in message
+            or "duplicate key value" in message
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Tracked sheet with the same spreadsheet_id and sheet_name already exists",
@@ -560,4 +588,6 @@ async def payment_user_detail(
             matched_user_tg_id=matched_user_tg_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
