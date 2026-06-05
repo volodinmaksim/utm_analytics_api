@@ -1,5 +1,12 @@
+from dataclasses import dataclass
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from analytics_app.app.broadcasts.exceptions import (
+    TemplateSendError,
+    TelegramRecipientSkipped,
+    TelegramTemporaryError,
+)
 from analytics_app.app.broadcasts.repository import (
     get_template_with_items,
 )
@@ -8,6 +15,12 @@ from analytics_app.app.schemas import Service, TelegramTemplateKind
 import httpx
 
 from analytics_app.app.schemas.broadcasts import TelegramTemplateStatus
+
+
+@dataclass(frozen=True)
+class TelegramSendResult:
+    sent_messages_count: int
+    sent_message_ids: list[int]
 
 
 def get_bot_token_by_service(service: Service) -> str | None:
@@ -20,11 +33,25 @@ def get_bot_token_by_service(service: Service) -> str | None:
     return None
 
 
-def check_telegram_response(response: httpx.Response) -> None:
-    response.raise_for_status()
-    data = response.json()
-    if not data.get("ok"):
-        raise ValueError(data)
+def check_telegram_response(response: httpx.Response) -> dict:
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise TelegramTemporaryError("Invalid Telegram response") from exc
+
+    if data.get("ok"):
+        return data
+
+    error_code = data.get("error_code", response.status_code)
+    description = str(data.get("description", ""))
+
+    if error_code == 403 or "bot was blocked" in description.lower():
+        raise TelegramRecipientSkipped(description)
+
+    if error_code == 429 or error_code >= 500:
+        raise TelegramTemporaryError(description)
+
+    raise TelegramTemporaryError(description)
 
 
 async def send_telegram_template_to_chat(
@@ -33,48 +60,65 @@ async def send_telegram_template_to_chat(
     template_id: int,
     service: Service,
     chat_id: int,
-) -> int:
+) -> TelegramSendResult:
     template = await get_template_with_items(
         session,
         template_id=template_id,
     )
     if template is None:
-        raise ValueError("Template not found")
+        raise TemplateSendError("Template not found")
 
     token = get_bot_token_by_service(service)
     if token is None:
-        raise ValueError("Service|Token not found")
+        raise TemplateSendError("Service|Token not found")
 
     if template.status != TelegramTemplateStatus.READY:
-        raise ValueError("Template is not ready")
+        raise TemplateSendError("Template is not ready")
 
     async with httpx.AsyncClient(timeout=10) as client:
         if template.kind == TelegramTemplateKind.SINGLE:
             if not template.items:
-                raise ValueError("Item not found")
+                raise TemplateSendError("Item not found")
             item = template.items[0]
-            response = await client.post(
-                f"https://api.telegram.org/bot{token}/copyMessage",
-                json={
-                    "chat_id": chat_id,
-                    "from_chat_id": template.source_chat_id,
-                    "message_id": item.source_message_id,
-                },
+            try:
+                response = await client.post(
+                    f"https://api.telegram.org/bot{token}/copyMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "from_chat_id": template.source_chat_id,
+                        "message_id": item.source_message_id,
+                    },
+                )
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                raise TelegramTemporaryError(str(exc)) from exc
+
+            data = check_telegram_response(response)
+            sent_message_id = data["result"]["message_id"]
+            return TelegramSendResult(
+                sent_messages_count=1,
+                sent_message_ids=[sent_message_id],
             )
-            check_telegram_response(response)
-            return 1
         else:
             items = sorted(template.items, key=lambda item: item.source_message_id)
             if not items:
-                raise ValueError("Items not found")
+                raise TemplateSendError("Items not found")
             message_ids = [item.source_message_id for item in items]
-            response = await client.post(
-                f"https://api.telegram.org/bot{token}/copyMessages",
-                json={
-                    "chat_id": chat_id,
-                    "from_chat_id": template.source_chat_id,
-                    "message_ids": message_ids,
-                },
+            try:
+                response = await client.post(
+                    f"https://api.telegram.org/bot{token}/copyMessages",
+                    json={
+                        "chat_id": chat_id,
+                        "from_chat_id": template.source_chat_id,
+                        "message_ids": message_ids,
+                    },
+                )
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                raise TelegramTemporaryError(str(exc)) from exc
+
+            data = check_telegram_response(response)
+            sent_message_ids = [item["message_id"] for item in data["result"]]
+
+            return TelegramSendResult(
+                sent_messages_count=len(sent_message_ids),
+                sent_message_ids=sent_message_ids,
             )
-            check_telegram_response(response)
-            return len(items)

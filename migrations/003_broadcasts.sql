@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS broadcasts (
     status VARCHAR(20) NOT NULL CHECK (
         status IN ('scheduled', 'sending', 'sent', 'cancelled', 'failed')
     ),
+    last_error TEXT NULL,
     scheduled_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     started_at TIMESTAMPTZ NULL,
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS broadcast_recipients (
     next_attempt_at TIMESTAMPTZ NULL,
     last_error TEXT NULL,
     sent_at TIMESTAMPTZ NULL,
+    sent_message_ids JSONB NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_broadcast_recipients_broadcast_tg

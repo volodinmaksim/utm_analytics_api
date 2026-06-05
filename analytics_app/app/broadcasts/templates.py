@@ -154,7 +154,7 @@ async def send_test_template_to_admin(
     template_id: int,
     service: Service,
 ) -> AdminTelegramTemplateSendTestResponse:
-    sent_messages_count = await send_telegram_template_to_chat(
+    send_result = await send_telegram_template_to_chat(
         session,
         template_id=template_id,
         service=service,
@@ -162,5 +162,5 @@ async def send_test_template_to_admin(
     )
     return AdminTelegramTemplateSendTestResponse(
         template_id=template_id,
-        sent_messages_count=sent_messages_count,
+        sent_messages_count=send_result.sent_messages_count,
     )

@@ -158,6 +158,7 @@ class Broadcast(Base):
         ),
         nullable=False,
     )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     scheduled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -216,6 +217,7 @@ class BroadcastRecipient(Base):
         DateTime(timezone=True), nullable=True
     )
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sent_message_ids: Mapped[list[int] | None] = mapped_column(JSONB, nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
