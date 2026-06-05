@@ -9,8 +9,19 @@ from analytics_app.app.models import (
     TelegramTemplate,
     TelegramTemplateStatus,
     TelegramTemplateItem,
+    Broadcast,
+    BroadcastRecipient,
+    User,
+    FarmaUser,
+    SfbtUser,
 )
-from analytics_app.app.schemas import TelegramTemplateKind
+from analytics_app.app.schemas import (
+    TelegramTemplateKind,
+    Service,
+    AudienceType,
+    BroadcastStatus,
+)
+from analytics_app.app.schemas.broadcasts import BroadcastRecipientStatus
 
 
 async def list_ready_telegram_templates(
@@ -147,3 +158,66 @@ async def get_template_with_items(
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def create_broadcast(
+    session: AsyncSession,
+    *,
+    template_id: int,
+    service: Service,
+    audience_type: AudienceType,
+    audience_filter: dict[str, Any],
+    scheduled_at: datetime,
+) -> Broadcast:
+    broadcast = Broadcast(
+        template_id=template_id,
+        service=service,
+        audience_type=audience_type,
+        audience_filter=audience_filter,
+        status=BroadcastStatus.SCHEDULED,
+        scheduled_at=scheduled_at,
+    )
+
+    session.add(broadcast)
+    await session.flush()
+    return broadcast
+
+
+async def create_broadcast_recipients(
+    session: AsyncSession,
+    *,
+    broadcast_id: int,
+    tg_ids: list[int],
+) -> list[BroadcastRecipient]:
+    recipients = []
+
+    for tg_id in tg_ids:
+        recipient = BroadcastRecipient(
+            broadcast_id=broadcast_id,
+            tg_id=tg_id,
+            status=BroadcastRecipientStatus.PENDING,
+        )
+        recipients.append(recipient)
+
+    session.add_all(recipients)
+    await session.flush()
+    return recipients
+
+
+async def get_all_user_tg_ids_by_service(
+    session: AsyncSession,
+    *,
+    service: Service,
+) -> list[int]:
+    if service == Service.RPP:
+        user_model = User
+    elif service == Service.FARMA:
+        user_model = FarmaUser
+    elif service == Service.SFBT:
+        user_model = SfbtUser
+    else:
+        raise ValueError("Unknown service")
+
+    stmt = select(user_model.tg_id).order_by(user_model.tg_id)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())

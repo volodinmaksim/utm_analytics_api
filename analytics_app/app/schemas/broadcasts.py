@@ -25,6 +25,14 @@ class BroadcastStatus(str, Enum):
     FAILED = "failed"
 
 
+class BroadcastRecipientStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SENT = "sent"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 class AudienceType(str, Enum):
     ALL = "all"
     UTM = "utm"

@@ -17,6 +17,7 @@ from analytics_app.app.admin_auth import (
     logout_admin,
     verify_admin_password,
 )
+from analytics_app.app.broadcasts.campaigns import create_admin_broadcast
 from analytics_app.app.clients.google_sheets import (
     GoogleSheetsConfigurationError,
     GoogleSheetsReadError,
@@ -57,7 +58,11 @@ from analytics_app.app.payments.tracked_sheets import (
     to_tracked_sheet_response,
     validate_tracked_sheet_access,
 )
-from analytics_app.app.schemas.broadcasts import AdminTelegramTemplateSendTestRequest
+from analytics_app.app.schemas.broadcasts import (
+    AdminTelegramTemplateSendTestRequest,
+    AdminBroadcastResponse,
+    AdminBroadcastCreateRequest,
+)
 from analytics_app.app.services.analytics import (
     get_audience,
     get_content,
@@ -196,6 +201,25 @@ async def check_template(
         session,
         template_id=template_id,
         service=data.service,
+    )
+
+
+@router.post(
+    "/api/admin/broadcasts",
+    response_model=AdminBroadcastResponse,
+)
+async def admin_create_broadcast(
+    _admin: AdminApiDep,
+    session: SessionDep,
+    data: AdminBroadcastCreateRequest,
+) -> AdminBroadcastResponse:
+    return await create_admin_broadcast(
+        session,
+        service=data.service,
+        template_id=data.template_id,
+        audience_type=data.audience_type,
+        audience_filter=data.audience_filter,
+        scheduled_at=data.scheduled_at,
     )
 
 
