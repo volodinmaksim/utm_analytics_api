@@ -8,8 +8,15 @@ from analytics_app.app.broadcasts.repository import (
     create_broadcast,
     create_broadcast_recipients,
     get_template_with_items,
+    list_broadcasts_with_counts,
 )
-from analytics_app.app.schemas import Service, AudienceType, AdminBroadcastResponse
+from analytics_app.app.schemas import (
+    Service,
+    AudienceType,
+    AdminBroadcastResponse,
+    AdminBroadcastListResponse,
+    AdminBroadcastListRow,
+)
 from analytics_app.app.models import TelegramTemplateStatus
 
 
@@ -62,4 +69,45 @@ async def create_admin_broadcast(
         created_at=broadcast.created_at,
         started_at=broadcast.started_at,
         finished_at=broadcast.finished_at,
+    )
+
+
+async def get_admin_broadcasts_list(
+    session: AsyncSession,
+    *,
+    limit: int,
+) -> AdminBroadcastListResponse:
+    safe_limit = max(1, min(limit, 100))
+    rows = await list_broadcasts_with_counts(session, limit=safe_limit + 1)
+    has_more = len(rows) > safe_limit
+    visible_rows = rows[:safe_limit]
+
+    items: list[AdminBroadcastListRow] = []
+    for row in visible_rows:
+        broadcast = row[0]
+        recipients_total = row.recipients_total or 0
+        sent_count = row.sent_count or 0
+        pending_count = row.pending_count or 0
+        processing_count = row.processing_count or 0
+        failed_count = row.failed_count or 0
+        skipped_count = row.skipped_count or 0
+        item = AdminBroadcastListRow(
+            id=broadcast.id,
+            template_id=broadcast.template_id,
+            service=broadcast.service,
+            audience_type=broadcast.audience_type,
+            status=broadcast.status,
+            scheduled_at=broadcast.scheduled_at,
+            created_at=broadcast.created_at,
+            recipients_total=recipients_total,
+            processing_count=processing_count,
+            sent_count=sent_count,
+            failed_count=failed_count,
+            skipped_count=skipped_count,
+            pending_count=pending_count,
+        )
+        items.append(item)
+    return AdminBroadcastListResponse(
+        items=items,
+        has_more=has_more,
     )

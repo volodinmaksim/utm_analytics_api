@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, case, func, Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -221,3 +222,56 @@ async def get_all_user_tg_ids_by_service(
     stmt = select(user_model.tg_id).order_by(user_model.tg_id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def list_broadcasts_with_counts(
+    session: AsyncSession,
+    *,
+    limit: int,
+) -> Sequence[Row]:
+    stmt = (
+        select(
+            Broadcast,
+            func.count(BroadcastRecipient.id).label("recipients_total"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.SENT, 1),
+                    else_=0,
+                )
+            ).label("sent_count"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.PENDING, 1),
+                    else_=0,
+                )
+            ).label("pending_count"),
+            func.sum(
+                case(
+                    (
+                        BroadcastRecipient.status
+                        == BroadcastRecipientStatus.PROCESSING,
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("processing_count"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.FAILED, 1),
+                    else_=0,
+                )
+            ).label("failed_count"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.SKIPPED, 1),
+                    else_=0,
+                )
+            ).label("skipped_count"),
+        )
+        .outerjoin(BroadcastRecipient)
+        .group_by(Broadcast.id)
+        .order_by(Broadcast.created_at.desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return result.all()
