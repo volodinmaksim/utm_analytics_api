@@ -9,6 +9,7 @@ from analytics_app.app.broadcasts.repository import (
     create_broadcast_recipients,
     get_template_with_items,
     list_broadcasts_with_counts,
+    get_broadcast_by_id,
 )
 from analytics_app.app.schemas import (
     Service,
@@ -16,8 +17,11 @@ from analytics_app.app.schemas import (
     AdminBroadcastResponse,
     AdminBroadcastListResponse,
     AdminBroadcastListRow,
+    AdminBroadcastCancelResponse,
+    BroadcastStatus as BroadcastSchemaStatus,
 )
-from analytics_app.app.models import TelegramTemplateStatus
+
+from analytics_app.app.models import TelegramTemplateStatus, BroadcastStatus
 
 
 async def create_admin_broadcast(
@@ -110,4 +114,23 @@ async def get_admin_broadcasts_list(
     return AdminBroadcastListResponse(
         items=items,
         has_more=has_more,
+    )
+
+
+async def cancel_admin_broadcast(
+    session: AsyncSession,
+    *,
+    broadcast_id: int,
+) -> AdminBroadcastCancelResponse:
+    broadcast = await get_broadcast_by_id(session, broadcast_id=broadcast_id)
+    if broadcast is None:
+        raise ValueError("Broadcast not found")
+    if broadcast.status != BroadcastStatus.SCHEDULED:
+        raise ValueError("Broadcast already started sending")
+
+    broadcast.status = BroadcastStatus.CANCELLED
+    await session.commit()
+    return AdminBroadcastCancelResponse(
+        id=broadcast.id,
+        status=BroadcastSchemaStatus(broadcast.status),
     )

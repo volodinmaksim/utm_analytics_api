@@ -275,3 +275,13 @@ async def list_broadcasts_with_counts(
     )
     result = await session.execute(stmt)
     return result.all()
+
+
+async def get_broadcast_by_id(
+    session: AsyncSession,
+    *,
+    broadcast_id: int,
+) -> Broadcast | None:
+    stmt = select(Broadcast).where(Broadcast.id == broadcast_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
