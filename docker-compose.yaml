@@ -22,12 +22,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
     env_file:
       - analytics.env
     environment:
       HOST: 0.0.0.0
       PORT: 8000
       DB_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
     ports:
       - "8000:8000"
     volumes:
@@ -46,3 +49,43 @@ services:
     command: ["python", "run_payments_worker.py"]
     volumes:
       - ./secrets:/app/secrets:ro
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./datab/rabbitmq:/var/lib/rabbitmq
+
+  celery_worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    env_file:
+      - analytics.env
+    environment:
+      DB_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+    command: [ "celery", "-A", "analytics_app.app.tasks.celery_app:celery_app", "worker", "--loglevel=INFO" ]
+
+  celery_beat:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    env_file:
+      - analytics.env
+    environment:
+      DB_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+    command: [ "celery", "-A", "analytics_app.app.tasks.celery_app:celery_app", "beat", "--loglevel=INFO" ]
+

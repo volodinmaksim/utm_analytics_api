@@ -1,5 +1,6 @@
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analytics_app.app.broadcasts import repository
@@ -71,7 +72,6 @@ def extract_chat_id(message: dict[str, Any]) -> int:
 
 def detect_content_type(message: dict[str, Any]) -> str:
     for content_type in (
-        "text",
         "photo",
         "video",
         "animation",
@@ -80,8 +80,9 @@ def detect_content_type(message: dict[str, Any]) -> str:
         "video_note",
         "audio",
         "sticker",
+        "text",
     ):
-        if content_type in message:
+        if message.get(content_type) is not None:
             return content_type
 
     return "unknown"
@@ -121,14 +122,25 @@ async def ingest_telegram_message(
             media_group_id=media_group_id,
         )
         if template is None:
-            template = await create_telegram_template(
-                session,
-                source_chat_id=chat_id,
-                media_group_id=media_group_id,
-                kind=TelegramTemplateKind.ALBUM,
-                status=TelegramTemplateStatus.COLLECTING,
-                preview_text=preview_text,
-            )
+            try:
+                template = await create_telegram_template(
+                    session,
+                    source_chat_id=chat_id,
+                    media_group_id=media_group_id,
+                    kind=TelegramTemplateKind.ALBUM,
+                    status=TelegramTemplateStatus.COLLECTING,
+                    preview_text=preview_text,
+                )
+            except IntegrityError:
+                await session.rollback()
+                template = await search_collecting_template_by_media_group(
+                    session,
+                    source_chat_id=chat_id,
+                    media_group_id=media_group_id,
+                )
+                if template is None:
+                    raise
+
     await create_telegram_template_item(
         session=session,
         template_id=template.id,

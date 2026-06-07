@@ -12,10 +12,22 @@ from analytics_app.app.tasks.celery_app import celery_app
 BROADCASTS_LIMIT = 10
 FINALIZE_TEMPLATES_LIMIT = 50
 
+_loop = None
+
+
+def run_async(coro):
+    global _loop
+
+    if _loop is None or _loop.is_closed():
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+
+    return _loop.run_until_complete(coro)
+
 
 @celery_app.task(name="broadcasts.process")
 def process_broadcasts_task() -> None:
-    asyncio.run(_process_broadcasts())
+    run_async(_process_broadcasts())
 
 
 async def _process_broadcasts() -> None:
@@ -32,7 +44,7 @@ async def _process_broadcasts() -> None:
 
 @celery_app.task(name="telegram_templates.finalize_collecting")
 def finalize_collecting_templates():
-    asyncio.run(_finalize_collecting_templates())
+    run_async(_finalize_collecting_templates())
 
 
 async def _finalize_collecting_templates():

@@ -17,6 +17,10 @@ CREATE INDEX IF NOT EXISTS ix_telegram_templates_status_created_at
 CREATE INDEX IF NOT EXISTS ix_telegram_templates_collecting_media_group
     ON telegram_templates (source_chat_id, media_group_id, status);
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_telegram_templates_media_group
+    ON telegram_templates (source_chat_id, media_group_id)
+    WHERE media_group_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS ix_telegram_templates_status_ready_after
     ON telegram_templates (status, ready_after);
 

@@ -51,6 +51,8 @@ async def search_collecting_template_by_media_group(
         .where(TelegramTemplate.source_chat_id == source_chat_id)
         .where(TelegramTemplate.media_group_id == media_group_id)
         .where(TelegramTemplate.status == TelegramTemplateStatus.COLLECTING)
+        .order_by(TelegramTemplate.id)
+        .limit(1)
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
@@ -118,7 +120,13 @@ async def update_collecting_template_summary(
     if template.status != TelegramTemplateStatus.COLLECTING:
         raise ValueError("Template is not collecting")
 
-    template.items_count += 1
+    count_result = await session.execute(
+        select(func.count(TelegramTemplateItem.id)).where(
+            TelegramTemplateItem.template_id == template_id
+        )
+    )
+    template.items_count = count_result.scalar_one()
+
     template.ready_after = datetime.now(timezone.utc) + timedelta(seconds=5)
 
     await session.flush()
@@ -588,7 +596,14 @@ async def mark_expired_collecting_templates_ready(
     )
     result = await session.execute(stmt)
     templates = list(result.scalars().all())
+
     for template in templates:
+        count_result = await session.execute(
+            select(func.count(TelegramTemplateItem.id)).where(
+                TelegramTemplateItem.template_id == template.id
+            )
+        )
+        template.items_count = count_result.scalar_one()
         template.status = TelegramTemplateStatus.READY
 
     await session.flush()
