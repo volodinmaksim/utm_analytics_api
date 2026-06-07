@@ -567,3 +567,29 @@ async def get_processable_broadcasts(
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def mark_expired_collecting_templates_ready(
+    session: AsyncSession,
+    *,
+    limit: int,
+) -> list[TelegramTemplate]:
+    stmt = (
+        select(TelegramTemplate)
+        .where(
+            and_(
+                TelegramTemplate.status == TelegramTemplateStatus.COLLECTING,
+                TelegramTemplate.ready_after <= func.now(),
+            )
+        )
+        .order_by(TelegramTemplate.ready_after, TelegramTemplate.id)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    )
+    result = await session.execute(stmt)
+    templates = list(result.scalars().all())
+    for template in templates:
+        template.status = TelegramTemplateStatus.READY
+
+    await session.flush()
+    return templates

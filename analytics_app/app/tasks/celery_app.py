@@ -21,4 +21,8 @@ celery_app.conf.beat_schedule = {
         "task": "broadcasts.process",
         "schedule": 10.0,
     },
+    "process-finalize-templates-every-5-seconds": {
+        "task": "telegram_templates.finalize_collecting",
+        "schedule": 5.0,
+    },
 }

@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     FARMA_FILE_EVENT: str = 'Получить файл: "Гайд по серотониновому синдрому"'
     SFBT_FILE_EVENT: str = 'Получить файл: "Пакет Опора и Ресурс"'
 
-    CELERY_BROKER_URL: str = "amqp://guest:guest@localhost:5672//"
-    CELERY_RESULT_BACKEND: str = "rpc://"
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
 
     model_config = SettingsConfigDict(
         env_file="analytics.env",
