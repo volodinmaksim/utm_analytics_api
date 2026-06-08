@@ -169,6 +169,23 @@ async def admin_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get(
+    "/admin/broadcasts",
+    response_class=HTMLResponse,
+    name="admin_broadcasts_page",
+)
+async def admin_broadcasts_page(request: Request) -> HTMLResponse:
+    ensure_admin_auth_configured()
+    if not is_admin_authenticated(request):
+        return _admin_login_redirect(request)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_broadcasts.html",
+        context={"base_url": settings.BASE_URL.rstrip("/")},
+    )
+
+
 @router.get("/api/admin/tracked-sheets", response_model=TrackedSheetsListResponse)
 async def list_tracked_sheets(
     _admin: AdminApiDep,

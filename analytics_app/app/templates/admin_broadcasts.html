@@ -1,0 +1,662 @@
+{% extends "base.html" %}
+
+{% block title %}???????? Telegram{% endblock %}
+
+{% block body %}
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root { color-scheme: light; }
+  html, body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  /* thin custom scrollbar for the dense lists */
+  .scroll-area { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+  .scroll-area::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+  .pulse-dot { animation: pulse-dot 1.1s ease-in-out infinite; }
+  @keyframes spin360 { to { transform: rotate(360deg); } }
+  .spinning { animation: spin360 .8s linear infinite; }
+  @keyframes skeleton { 0% { background-position: -200px 0; } 100% { background-position: calc(200px + 100%) 0; } }
+  .skeleton { background: linear-gradient(90deg,#eef2f6 0px,#f6f8fb 80px,#eef2f6 160px); background-size: 200px 100%; animation: skeleton 1.1s infinite linear; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .toast-in { animation: toast-in .22s cubic-bezier(.2,.8,.2,1) both; }
+</style>
+<!-- ░░░░░░░░░░░░░░░░░░░░░░░░░░  PAGE BODY (block body)  ░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+
+<!-- Top bar -->
+<header class="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
+  <div class="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-900 text-white">
+        <i data-lucide="send" class="h-[18px] w-[18px]"></i>
+      </div>
+      <div class="min-w-0 leading-tight">
+        <div class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Admin</div>
+        <h1 class="truncate text-[15px] font-semibold tracking-tight text-slate-900">Рассылки Telegram</h1>
+      </div>
+    </div>
+    <nav class="flex items-center gap-2">
+      <a href="/admin" class="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 sm:inline-flex">
+        <i data-lucide="database" class="h-4 w-4"></i><span>Источники</span>
+      </a>
+      <a href="/" class="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 sm:inline-flex">
+        <i data-lucide="layout-dashboard" class="h-4 w-4"></i><span>Dashboard</span>
+      </a>
+      <form method="post" action="/admin/logout">
+        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+          <i data-lucide="log-out" class="h-4 w-4"></i><span>Выйти</span>
+        </button>
+      </form>
+    </nav>
+  </div>
+</header>
+
+<main class="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+
+    <!-- ── LEFT / CENTER column ── -->
+    <div class="flex flex-col gap-6 lg:col-span-8">
+
+      <!-- Templates card -->
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-semibold tracking-tight text-slate-900">Шаблоны</h2>
+              <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500" id="tplCount">—</span>
+            </div>
+            <p class="mt-0.5 text-xs text-slate-400" id="tplMeta">Сообщения из служебного чата</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <button id="tplRefresh" type="button" title="Обновить"
+              class="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
+              <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+            </button>
+            <button id="tplMore" type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+              <i data-lucide="chevrons-down" class="h-4 w-4"></i><span>Показать больше</span>
+            </button>
+          </div>
+        </div>
+        <div id="tplList" class="scroll-area max-h-[520px] divide-y divide-slate-100 overflow-y-auto"></div>
+      </section>
+
+      <!-- Broadcasts card -->
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-semibold tracking-tight text-slate-900">Рассылки</h2>
+              <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500" id="bcCount">—</span>
+            </div>
+            <p class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
+              <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 pulse-dot"></span>
+              <span id="bcAuto">Автообновление каждые 8 с</span>
+            </p>
+          </div>
+          <button id="bcRefresh" type="button" title="Обновить"
+            class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
+            <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+          </button>
+        </div>
+
+        <!-- desktop table / mobile cards both fed by JS -->
+        <div class="hidden md:block">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-100 text-left text-[11px] uppercase tracking-wider text-slate-400">
+                <th class="px-5 py-2.5 font-medium">ID</th>
+                <th class="px-3 py-2.5 font-medium">Сервис</th>
+                <th class="px-3 py-2.5 font-medium">Статус</th>
+                <th class="px-3 py-2.5 font-medium">Запланировано</th>
+                <th class="px-3 py-2.5 font-medium">Прогресс</th>
+                <th class="px-5 py-2.5 text-right font-medium">Действие</th>
+              </tr>
+            </thead>
+            <tbody id="bcTable" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+        <div id="bcCards" class="divide-y divide-slate-100 md:hidden"></div>
+      </section>
+    </div>
+
+    <!-- ── RIGHT column (sticky) ── -->
+    <aside class="lg:col-span-4">
+      <div class="flex flex-col gap-5 lg:sticky lg:top-[84px]">
+
+        <!-- Create broadcast -->
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-5 py-4">
+            <h2 class="text-base font-semibold tracking-tight text-slate-900">Новая рассылка</h2>
+            <p class="mt-0.5 text-xs text-slate-400">Выберите шаблон и параметры отправки</p>
+          </div>
+          <form id="createForm" class="flex flex-col gap-4 px-5 py-4">
+
+            <!-- selected template slot -->
+            <div>
+              <label class="mb-1.5 block text-xs font-medium text-slate-500">Шаблон</label>
+              <div id="tplSlot"
+                class="flex items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-400">
+                <i data-lucide="mouse-pointer-click" class="h-4 w-4"></i>
+                <span>Шаблон не выбран — выберите его в списке слева</span>
+              </div>
+            </div>
+
+            <div>
+              <label for="service" class="mb-1.5 block text-xs font-medium text-slate-500">Сервис</label>
+              <div class="relative">
+                <select id="service" name="service"
+                  class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10">
+                  <option value="rpp">rpp</option>
+                  <option value="farma">farma</option>
+                  <option value="sfbt">sfbt</option>
+                </select>
+                <i data-lucide="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+              </div>
+            </div>
+
+            <div>
+              <label for="audience" class="mb-1.5 block text-xs font-medium text-slate-500">Аудитория</label>
+              <div class="relative">
+                <select id="audience" name="audience_type"
+                  class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10">
+                  <option value="all">all — все получатели</option>
+                </select>
+                <i data-lucide="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+              </div>
+            </div>
+
+            <div>
+              <label for="scheduled_at" class="mb-1.5 block text-xs font-medium text-slate-500">Запланировать</label>
+              <input id="scheduled_at" name="scheduled_at" type="datetime-local" required
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
+              <p class="mt-1 text-xs text-slate-400">По умолчанию ставится ближайшее безопасное время</p>
+            </div>
+
+            <!-- inline form message -->
+            <div id="formMsg" class="hidden"></div>
+
+            <button id="createBtn" type="submit" disabled
+              class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
+              <i data-lucide="send-horizontal" class="h-4 w-4"></i>
+              <span id="createBtnText">Создать рассылку</span>
+            </button>
+          </form>
+        </section>
+
+        <!-- Selected template preview -->
+        <section id="previewCard" class="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="flex items-start justify-between gap-2 border-b border-slate-100 px-5 py-4">
+            <div class="min-w-0">
+              <h2 class="text-sm font-semibold tracking-tight text-slate-900">Выбранный шаблон</h2>
+              <p id="previewMeta" class="mt-0.5 truncate text-xs text-slate-400">—</p>
+            </div>
+            <button id="previewTest" type="button"
+              class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50">
+              <i data-lucide="shield-check" class="h-3.5 w-3.5"></i><span>Тест</span>
+            </button>
+          </div>
+          <div class="px-5 py-4">
+            <div id="previewBody" class="max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-slate-50 px-3.5 py-3 text-sm leading-relaxed text-slate-700"></div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<!-- toast region -->
+<div id="toasts" class="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4"></div>
+
+<!-- ░░░░░░░░░░░░░░░░░░░░░░░░░░  APP SCRIPT (block scripts)  ░░░░░░░░░░░░░░░░░░░░░░░░ -->
+<script>
+(function () {
+  "use strict";
+
+  // ── config ──────────────────────────────────────────────────────────────
+  const API = {
+    templates: (limit) => `/api/admin/telegram-templates?limit=${limit}`,
+    sendTest:  (id) => `/api/admin/telegram-templates/${id}/send-test`,
+    broadcasts:(limit) => `/api/admin/broadcasts?limit=${limit}`,
+    create:    () => `/api/admin/broadcasts`,
+    cancel:    (id) => `/api/admin/broadcasts/${id}/cancel`,
+  };
+  const LOGIN_URL = "/admin/login";
+  const TPL_STEP = 8;
+  const BC_LIMIT = 20;
+  const AUTO_REFRESH_MS = 8000;
+
+  // ── state ───────────────────────────────────────────────────────────────
+  let tplLimit = TPL_STEP;
+  let tplHasMore = true;
+  let selected = null;        // selected template object
+  let autoTimer = null;
+
+  // ── tiny dom helpers ────────────────────────────────────────────────────
+  const $ = (s) => document.querySelector(s);
+  const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const icons = () => window.lucide && window.lucide.createIcons();
+
+  // accept array | {items|data|results|templates|broadcasts:[...]}
+  function pickList(json) {
+    if (Array.isArray(json)) return json;
+    if (json && typeof json === "object") {
+      for (const k of ["items","data","results","templates","broadcasts"]) if (Array.isArray(json[k])) return json[k];
+    }
+    return [];
+  }
+
+  // ── fetch wrapper: same-origin creds, 401 -> login ──────────────────────
+  async function api(url, opts = {}) {
+    let res;
+    try {
+      res = await fetch(url, Object.assign({ credentials: "same-origin", headers: { "Accept": "application/json" } }, opts));
+    } catch (e) {
+      throw new Error("Сеть недоступна");
+    }
+    if (res.status === 401) { window.location.href = LOGIN_URL; throw new Error("Не авторизован"); }
+    if (!res.ok) {
+      let detail = "";
+      try { const j = await res.json(); detail = j.detail || j.message || j.error || ""; } catch (e) {}
+      throw new Error(detail || `Ошибка ${res.status}`);
+    }
+    if (res.status === 204) return null;
+    try { return await res.json(); } catch (e) { return null; }
+  }
+
+  // ── formatting ──────────────────────────────────────────────────────────
+  const pad = (n) => String(n).padStart(2, "0");
+  function fmtDateTime(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso); if (isNaN(d)) return "—";
+    return `${pad(d.getDate())}.${pad(d.getMonth()+1)}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function fmtFull(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso); if (isNaN(d)) return "—";
+    return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  const nf = new Intl.NumberFormat("ru-RU");
+
+  // ── badges ──────────────────────────────────────────────────────────────
+  function kindBadge(kind) {
+    const map = {
+      single: ["text-sky-700","bg-sky-50","ring-sky-200/70","square"],
+      album:  ["text-violet-700","bg-violet-50","ring-violet-200/70","layers"],
+    };
+    const [t,b,r,ic] = map[kind] || ["text-slate-600","bg-slate-100","ring-slate-200","file"];
+    return `<span class="inline-flex items-center gap-1 rounded-md ${b} px-1.5 py-0.5 text-[11px] font-semibold ${t} ring-1 ${r}">
+      <i data-lucide="${ic}" class="h-3 w-3"></i>${esc(kind)}</span>`;
+  }
+
+  const STATUS = {
+    scheduled: { label: "scheduled", cls: "text-amber-700 bg-amber-50 ring-amber-200/70",   dot: "bg-amber-500" },
+    sending:   { label: "sending",   cls: "text-blue-700 bg-blue-50 ring-blue-200/70",       dot: "bg-blue-500 pulse-dot" },
+    sent:      { label: "sent",      cls: "text-emerald-700 bg-emerald-50 ring-emerald-200/70", dot: "bg-emerald-500" },
+    cancelled: { label: "cancelled", cls: "text-slate-600 bg-slate-100 ring-slate-200",      dot: "bg-slate-400" },
+    failed:    { label: "failed",    cls: "text-rose-700 bg-rose-50 ring-rose-200/70",        dot: "bg-rose-500" },
+  };
+  function statusBadge(status) {
+    const s = STATUS[status] || { label: status || "—", cls: "text-slate-600 bg-slate-100 ring-slate-200", dot: "bg-slate-400" };
+    return `<span class="inline-flex items-center gap-1.5 rounded-full ${s.cls} px-2 py-0.5 text-xs font-semibold ring-1">
+      <span class="h-1.5 w-1.5 rounded-full ${s.dot}"></span>${esc(s.label)}</span>`;
+  }
+
+  // ── toasts ──────────────────────────────────────────────────────────────
+  function toast(message, kind = "info") {
+    const tones = {
+      success: ["bg-slate-900","text-white","circle-check"],
+      error:   ["bg-rose-600","text-white","circle-alert"],
+      info:    ["bg-slate-900","text-white","info"],
+    };
+    const [bg, fg, ic] = tones[kind] || tones.info;
+    const t = el("div", `toast-in pointer-events-auto flex items-center gap-2.5 rounded-xl ${bg} ${fg} px-4 py-2.5 text-sm font-medium shadow-lg`);
+    t.innerHTML = `<i data-lucide="${ic}" class="h-4 w-4"></i><span>${esc(message)}</span>`;
+    $("#toasts").appendChild(t); icons();
+    setTimeout(() => { t.style.transition = "opacity .3s, transform .3s"; t.style.opacity = "0"; t.style.transform = "translateY(8px)"; setTimeout(() => t.remove(), 320); }, 2600);
+  }
+
+  function spin(btn, on) {
+    const i = btn.querySelector("[data-lucide], svg");
+    if (i) i.classList.toggle("spinning", on);
+    btn.disabled = on;
+  }
+
+  // ════════════════════════ TEMPLATES ════════════════════════
+  function tplSkeleton() {
+    const list = $("#tplList"); list.innerHTML = "";
+    for (let i = 0; i < 4; i++) {
+      const row = el("div", "px-5 py-4");
+      row.innerHTML = `<div class="flex items-center gap-2"><div class="skeleton h-5 w-12 rounded-md"></div><div class="skeleton h-5 w-16 rounded-md"></div><div class="skeleton h-5 w-14 rounded-md"></div></div>
+        <div class="skeleton mt-2.5 h-4 w-2/3 rounded"></div>`;
+      list.appendChild(row);
+    }
+  }
+
+  function renderTemplates(items) {
+    const list = $("#tplList");
+    list.innerHTML = "";
+    if (!items.length) {
+      list.appendChild(el("div", "px-5 py-10 text-center text-sm text-slate-400", "Шаблонов пока нет"));
+      return;
+    }
+    items.forEach((t) => {
+      const isSel = selected && selected.id === t.id;
+      const row = el("div",
+        "group flex items-start gap-3 px-5 py-3.5 transition " + (isSel ? "bg-slate-50 ring-1 ring-inset ring-slate-900/10" : "hover:bg-slate-50/70"));
+      row.dataset.id = t.id;
+      const txt = (t.preview_text && String(t.preview_text).trim()) ? esc(t.preview_text) : '<span class="italic text-slate-400">Без текста</span>';
+      row.innerHTML = `
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">#${esc(t.id)}</span>
+            ${kindBadge(t.kind)}
+            <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+              <i data-lucide="image" class="h-3 w-3"></i>${esc(t.items_count)} эл.</span>
+            <span class="ml-0.5 text-[11px] text-slate-400">${fmtDateTime(t.created_at)}</span>
+          </div>
+          <p class="mt-1.5 truncate text-sm text-slate-700">${txt}</p>
+        </div>
+        <div class="flex shrink-0 items-center gap-1.5">
+          <button type="button" data-act="select" title="Выбрать шаблон"
+            class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${isSel ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}">
+            <i data-lucide="${isSel ? "check" : "circle-plus"}" class="h-3.5 w-3.5"></i>
+            <span class="hidden sm:inline">${isSel ? "Выбран" : "Выбрать"}</span>
+          </button>
+          <button type="button" data-act="test" title="Отправить тест админу"
+            class="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
+            <i data-lucide="shield-check" class="h-4 w-4"></i>
+          </button>
+        </div>`;
+      row.querySelector('[data-act="select"]').addEventListener("click", () => selectTemplate(t));
+      row.querySelector('[data-act="test"]').addEventListener("click", (e) => sendTest(t, e.currentTarget));
+      list.appendChild(row);
+    });
+    icons();
+  }
+
+  async function loadTemplates() {
+    const more = $("#tplMore");
+    if (!$("#tplList").children.length) tplSkeleton();
+    try {
+      const json = await api(API.templates(tplLimit));
+      const items = pickList(json);
+      tplHasMore = (typeof json?.has_more === "boolean") ? json.has_more
+                 : (typeof json?.total === "number") ? items.length < json.total
+                 : items.length >= tplLimit;
+      renderTemplates(items);
+      $("#tplCount").textContent = (json?.total ?? items.length) + "";
+      $("#tplMeta").textContent = `Загружено ${items.length}${tplHasMore ? " · есть ещё" : ""}`;
+      more.disabled = !tplHasMore;
+      more.querySelector("span").textContent = tplHasMore ? "Показать больше" : "Все загружены";
+      // re-sync selected preview if it changed
+      if (selected) { const fresh = items.find((x) => x.id === selected.id); if (fresh) selected = fresh; }
+    } catch (e) {
+      $("#tplList").innerHTML = "";
+      $("#tplList").appendChild(errorRow(e.message, loadTemplates));
+    }
+  }
+
+  function errorRow(msg, retry) {
+    const row = el("div", "flex items-center justify-between gap-3 px-5 py-5 text-sm");
+    row.innerHTML = `<span class="flex items-center gap-2 text-rose-600"><i data-lucide="circle-alert" class="h-4 w-4"></i>${esc(msg)}</span>`;
+    const b = el("button", "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50", "Повторить");
+    b.addEventListener("click", retry); row.appendChild(b); setTimeout(icons);
+    return row;
+  }
+
+  async function sendTest(t, btn) {
+    spin(btn, true);
+    try {
+      await api(API.sendTest(t.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service: $("#service").value }),
+      });
+      toast(`Тест шаблона #${t.id} отправлен админу`, "success");
+    } catch (e) {
+      toast(e.message || "Не удалось отправить тест", "error");
+    } finally { spin(btn, false); icons(); }
+  }
+
+  function selectTemplate(t) {
+    selected = t;
+    // slot
+    const slot = $("#tplSlot");
+    slot.className = "flex items-center justify-between gap-2 rounded-xl border border-slate-900/10 bg-slate-900/[0.03] px-3 py-2.5 text-sm";
+    slot.innerHTML = `
+      <span class="flex min-w-0 items-center gap-2">
+        <span class="rounded-md bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold text-white">#${esc(t.id)}</span>
+        ${kindBadge(t.kind)}
+        <span class="truncate text-slate-500">${esc(t.items_count)} эл.</span>
+      </span>
+      <button type="button" id="tplClear" class="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700">
+        <i data-lucide="x" class="h-3.5 w-3.5"></i>
+      </button>`;
+    slot.querySelector("#tplClear").addEventListener("click", clearTemplate);
+    // preview card
+    $("#previewCard").classList.remove("hidden");
+    $("#previewMeta").textContent = `${t.kind} · ${t.items_count} эл. · ${fmtDateTime(t.created_at)}`;
+    const body = (t.preview_text && String(t.preview_text).trim()) ? esc(t.preview_text) : '<span class="italic text-slate-400">Без текста</span>';
+    $("#previewBody").innerHTML = body;
+    $("#previewTest").onclick = (e) => sendTest(t, e.currentTarget);
+    // button
+    $("#createBtn").disabled = false;
+    loadTemplates(); // re-render list highlight
+    icons();
+  }
+
+  function clearTemplate() {
+    selected = null;
+    const slot = $("#tplSlot");
+    slot.className = "flex items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-400";
+    slot.innerHTML = `<i data-lucide="mouse-pointer-click" class="h-4 w-4"></i><span>Шаблон не выбран — выберите его в списке слева</span>`;
+    $("#previewCard").classList.add("hidden");
+    $("#createBtn").disabled = true;
+    loadTemplates();
+    icons();
+  }
+
+  // ════════════════════════ CREATE ════════════════════════
+  function formMsg(kind, text) {
+    const box = $("#formMsg");
+    if (!kind) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    const tones = {
+      success: ["bg-emerald-50 text-emerald-700 ring-emerald-200/70", "circle-check"],
+      error:   ["bg-rose-50 text-rose-700 ring-rose-200/70", "circle-alert"],
+    };
+    const [cls, ic] = tones[kind] || tones.error;
+    box.className = `flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm font-medium ring-1 ${cls}`;
+    box.innerHTML = `<i data-lucide="${ic}" class="mt-0.5 h-4 w-4 shrink-0"></i><span>${esc(text)}</span>`;
+    box.classList.remove("hidden"); icons();
+  }
+
+  async function createBroadcast(e) {
+    e.preventDefault();
+    if (!selected) { formMsg("error", "Сначала выберите шаблон"); return; }
+    const btn = $("#createBtn");
+    const payload = {
+      template_id: selected.id,
+      service: $("#service").value,
+      audience_type: $("#audience").value,
+      audience_filter: {},
+      scheduled_at: new Date($("#scheduled_at").value).toISOString(),
+    };
+    btn.disabled = true;
+    $("#createBtnText").textContent = "Создаём…";
+    btn.querySelector("[data-lucide], svg")?.classList.add("spinning");
+    formMsg(null);
+    try {
+      const created = await api(API.create(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const id = created?.id;
+      formMsg("success", id ? `Рассылка #${id} создана` : "Рассылка создана");
+      toast(id ? `Рассылка #${id} создана` : "Рассылка создана", "success");
+      setDefaultSchedule();
+      await loadBroadcasts();
+    } catch (err) {
+      formMsg("error", err.message || "Не удалось создать рассылку");
+    } finally {
+      btn.disabled = !selected;
+      $("#createBtnText").textContent = "Создать рассылку";
+      btn.querySelector("[data-lucide], svg")?.classList.remove("spinning");
+      icons();
+    }
+  }
+
+  // ════════════════════════ BROADCASTS ════════════════════════
+  function progressCell(b) {
+    const total = +b.recipients_total || 0;
+    const sent = +b.sent_count || 0;
+    const skip = +b.skipped_count || 0;
+    const fail = +b.failed_count || 0;
+    const pct = total ? Math.round(((sent + skip + fail) / total) * 100) : 0;
+    const wSent = total ? (sent/total*100) : 0;
+    const wFail = total ? (fail/total*100) : 0;
+    const wSkip = total ? (skip/total*100) : 0;
+    return `
+      <div class="min-w-[150px]">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-medium text-slate-700">${nf.format(sent)}<span class="text-slate-400">/${nf.format(total)}</span></span>
+          <span class="text-slate-400">${pct}%</span>
+        </div>
+        <div class="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div class="bg-emerald-500" style="width:${wSent}%"></div>
+          <div class="bg-amber-400" style="width:${wSkip}%"></div>
+          <div class="bg-rose-500" style="width:${wFail}%"></div>
+        </div>
+        <div class="mt-1 flex flex-wrap gap-x-2.5 gap-y-0.5 text-[11px] text-slate-400">
+          ${skip ? `<span>skip ${nf.format(skip)}</span>` : ""}
+          ${fail ? `<span class="text-rose-500">fail ${nf.format(fail)}</span>` : ""}
+          ${(+b.pending_count) ? `<span>в очереди ${nf.format(b.pending_count)}</span>` : ""}
+        </div>
+      </div>`;
+  }
+
+  function cancelBtn(b) {
+    if (b.status !== "scheduled") {
+      return `<span class="grid h-8 w-8 place-items-center text-slate-200"><i data-lucide="minus" class="h-4 w-4"></i></span>`;
+    }
+    return `<button type="button" data-act="cancel" title="Отменить рассылку"
+      class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600">
+      <i data-lucide="ban" class="h-3.5 w-3.5"></i><span class="hidden lg:inline">Отменить</span></button>`;
+  }
+
+  function serviceChip(s) {
+    const colors = { rpp: "bg-indigo-400", farma: "bg-teal-400", sfbt: "bg-orange-400" };
+    return `<span class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700">
+      <span class="h-1.5 w-1.5 rounded-full ${colors[s] || "bg-slate-300"}"></span>${esc(s)}</span>`;
+  }
+
+  function bcSkeleton() {
+    const tb = $("#bcTable"); tb.innerHTML = "";
+    for (let i = 0; i < 5; i++) {
+      const tr = el("tr");
+      tr.innerHTML = `<td class="px-5 py-3.5"><div class="skeleton h-4 w-10 rounded"></div></td>
+        <td class="px-3 py-3.5"><div class="skeleton h-4 w-14 rounded"></div></td>
+        <td class="px-3 py-3.5"><div class="skeleton h-5 w-20 rounded-full"></div></td>
+        <td class="px-3 py-3.5"><div class="skeleton h-4 w-24 rounded"></div></td>
+        <td class="px-3 py-3.5"><div class="skeleton h-4 w-28 rounded"></div></td>
+        <td class="px-5 py-3.5"><div class="skeleton ml-auto h-7 w-7 rounded-lg"></div></td>`;
+      tb.appendChild(tr);
+    }
+  }
+
+  function renderBroadcasts(items) {
+    const tb = $("#bcTable");
+    const cards = $("#bcCards");
+    tb.innerHTML = ""; cards.innerHTML = "";
+    if (!items.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="px-5 py-10 text-center text-sm text-slate-400">Рассылок пока нет</td></tr>`;
+      cards.innerHTML = `<div class="px-5 py-10 text-center text-sm text-slate-400">Рассылок пока нет</div>`;
+      return;
+    }
+    items.forEach((b) => {
+      // table row
+      const tr = el("tr", "transition hover:bg-slate-50/70");
+      tr.innerHTML = `
+        <td class="px-5 py-3.5 font-semibold text-slate-900">#${esc(b.id)}</td>
+        <td class="px-3 py-3.5">${serviceChip(b.service)}</td>
+        <td class="px-3 py-3.5">${statusBadge(b.status)}</td>
+        <td class="px-3 py-3.5 whitespace-nowrap text-slate-500">${fmtFull(b.scheduled_at)}</td>
+        <td class="px-3 py-3.5">${progressCell(b)}</td>
+        <td class="px-5 py-3.5 text-right">${cancelBtn(b)}</td>`;
+      const cb = tr.querySelector('[data-act="cancel"]');
+      if (cb) cb.addEventListener("click", (e) => cancelBroadcast(b, e.currentTarget));
+      tb.appendChild(tr);
+
+      // mobile card
+      const card = el("div", "px-5 py-4");
+      card.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-slate-900">#${esc(b.id)}</span>
+            ${serviceChip(b.service)}
+          </div>
+          ${statusBadge(b.status)}
+        </div>
+        <div class="mt-2 text-xs text-slate-400">${fmtFull(b.scheduled_at)}</div>
+        <div class="mt-2.5">${progressCell(b)}</div>
+        <div class="mt-3">${cancelBtn(b)}</div>`;
+      const cb2 = card.querySelector('[data-act="cancel"]');
+      if (cb2) cb2.addEventListener("click", (e) => cancelBroadcast(b, e.currentTarget));
+      cards.appendChild(card);
+    });
+    icons();
+  }
+
+  async function loadBroadcasts(showSkeleton) {
+    if (showSkeleton && !$("#bcTable").children.length) bcSkeleton();
+    try {
+      const json = await api(API.broadcasts(BC_LIMIT));
+      const items = pickList(json);
+      renderBroadcasts(items);
+      $("#bcCount").textContent = (json?.total ?? items.length) + "";
+    } catch (e) {
+      $("#bcTable").innerHTML = `<tr><td colspan="6" class="px-5 py-5"><span class="flex items-center gap-2 text-sm text-rose-600"><i data-lucide="circle-alert" class="h-4 w-4"></i>${esc(e.message)}</span></td></tr>`;
+      icons();
+    }
+  }
+
+  async function cancelBroadcast(b, btn) {
+    const original = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = `<i data-lucide="loader" class="h-3.5 w-3.5 spinning"></i><span class="hidden lg:inline">Отмена…</span>`; icons();
+    try {
+      await api(API.cancel(b.id), { method: "POST" });
+      toast(`Рассылка #${b.id} отменена`, "success");
+      await loadBroadcasts();
+    } catch (e) {
+      toast(e.message || "Не удалось отменить", "error");
+      btn.disabled = false; btn.innerHTML = original; icons();
+    }
+  }
+
+  // ── auto refresh (pause when tab hidden) ────────────────────────────────
+  function startAuto() {
+    stopAuto();
+    autoTimer = setInterval(() => { if (!document.hidden) loadBroadcasts(false); }, AUTO_REFRESH_MS);
+  }
+  function stopAuto() { if (autoTimer) clearInterval(autoTimer); autoTimer = null; }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadBroadcasts(false); });
+
+  function setDefaultSchedule() {
+    const date = new Date(Date.now() + 5 * 60 * 1000);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    $("#scheduled_at").value = local.toISOString().slice(0, 16);
+  }
+
+  // ── wire up ─────────────────────────────────────────────────────────────
+  $("#tplRefresh").addEventListener("click", (e) => { spin(e.currentTarget, true); loadTemplates().finally(() => { spin(e.currentTarget, false); icons(); }); });
+  $("#tplMore").addEventListener("click", () => { if (!tplHasMore) return; tplLimit += TPL_STEP; loadTemplates(); });
+  $("#bcRefresh").addEventListener("click", (e) => { spin(e.currentTarget, true); loadBroadcasts(false).finally(() => { spin(e.currentTarget, false); icons(); }); });
+  $("#createForm").addEventListener("submit", createBroadcast);
+
+  // ── init ────────────────────────────────────────────────────────────────
+  setDefaultSchedule();
+  icons();
+  loadTemplates();
+  loadBroadcasts(true);
+  startAuto();
+})();
+</script>
+{% endblock %}

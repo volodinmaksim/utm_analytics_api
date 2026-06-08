@@ -44,8 +44,13 @@ def check_telegram_response(response: httpx.Response) -> dict:
 
     error_code = data.get("error_code", response.status_code)
     description = str(data.get("description", ""))
+    description_lower = description.lower()
 
-    if error_code == 403 or "bot was blocked" in description.lower():
+    if (
+        error_code == 403
+        or "bot was blocked" in description_lower
+        or "chat not found" in description_lower
+    ):
         raise TelegramRecipientSkipped(description)
 
     if error_code == 429 or error_code >= 500:
