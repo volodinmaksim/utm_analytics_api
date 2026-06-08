@@ -1,10 +1,12 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from analytics_app.app.routers.dashboard import router as dashboard_router
 from analytics_app.app.routers.internal import router as internal_router
 from analytics_app.app.db import settings
 
 app = FastAPI(title="UTM Analytics", version="1.0.0")
+app.mount("/static", StaticFiles(directory="analytics_app/app/static"), name="static")
 app.include_router(dashboard_router)
 app.include_router(internal_router)
 

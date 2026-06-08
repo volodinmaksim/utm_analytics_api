@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "build:css": "tailwindcss -i ./analytics_app/app/static/src/admin.css -o ./analytics_app/app/static/admin.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.17",
+    "tailwindcss": "^4.1.17"
+  }
+}
