@@ -8,6 +8,7 @@ class Service(str, Enum):
     RPP = "rpp"
     FARMA = "farma"
     SFBT = "sfbt"
+    CBTBASE = "cbtbase"
 
 
 class Period(str, Enum):

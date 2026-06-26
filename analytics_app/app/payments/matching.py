@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from analytics_app.app.models import FarmaUser, ServiceType, SfbtUser, User
+from analytics_app.app.models import CbtbaseUser, FarmaUser, ServiceType, SfbtUser, User
 from analytics_app.app.payments.normalization import PaymentEventPayload
 
 
@@ -9,6 +9,7 @@ SERVICE_MATCHING_CONFIG = {
     ServiceType.RPP: (User, "user_id"),
     ServiceType.FARMA: (FarmaUser, "farma_user_id"),
     ServiceType.SFBT: (SfbtUser, "sfbt_user_id"),
+    ServiceType.CBTBASE: (CbtbaseUser, "cbtbase_user_id"),
 }
 
 

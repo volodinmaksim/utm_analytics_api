@@ -57,6 +57,7 @@ class PaymentEventPayload:
     user_id: int | None = None
     farma_user_id: int | None = None
     sfbt_user_id: int | None = None
+    cbtbase_user_id: int | None = None
     matched_user_tg_id: int | None = None
 
     @classmethod

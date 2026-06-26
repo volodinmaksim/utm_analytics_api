@@ -61,10 +61,16 @@ SFBT_FUNNEL_EVENTS = (
     ("after_link_yes_day_2_sent", "after_link_yes_day_2_sent"),
 )
 
+CBTBASE_FUNNEL_EVENTS = (
+    ("advertising_consent", "advertising_consent"),
+    ("file_received", settings.CBTBASE_FILE_EVENT),
+)
+
 SERVICE_FUNNEL_EVENTS = {
     Service.RPP: RPP_FUNNEL_EVENTS,
     Service.FARMA: FARMA_FUNNEL_EVENTS,
     Service.SFBT: SFBT_FUNNEL_EVENTS,
+    Service.CBTBASE: CBTBASE_FUNNEL_EVENTS,
 }
 
 FUNNEL_LABELS = {
@@ -80,6 +86,7 @@ FUNNEL_LABELS = {
     "after_link_yes_delay_2_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d follow-up 2",
     "after_link_yes_day_1_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d day 1",
     "after_link_yes_day_2_sent": "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d day 2",
+    "advertising_consent": "\u0414\u0430\u043b\u0438 \u0441\u043e\u0433\u043b\u0430\u0441\u0438\u0435 \u043d\u0430 \u0440\u0435\u043a\u043b\u0430\u043c\u0443",
 }
 
 RPP_CONTENT_EVENT_LABELS = {
@@ -123,6 +130,7 @@ SERVICE_CONTENT_EVENT_LABELS = {
     Service.RPP: RPP_CONTENT_EVENT_LABELS,
     Service.FARMA: {},
     Service.SFBT: SFBT_CONTENT_EVENT_LABELS,
+    Service.CBTBASE: {},
 }
 
 SECTION_TTLS = {

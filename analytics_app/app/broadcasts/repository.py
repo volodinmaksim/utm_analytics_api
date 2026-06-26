@@ -14,6 +14,7 @@ from analytics_app.app.models import (
     BroadcastRecipient,
     User,
     FarmaUser,
+    CbtbaseUser,
     SfbtUser,
 )
 from analytics_app.app.schemas import (
@@ -224,6 +225,8 @@ async def get_all_user_tg_ids_by_service(
         user_model = FarmaUser
     elif service == Service.SFBT:
         user_model = SfbtUser
+    elif service == Service.CBTBASE:
+        user_model = CbtbaseUser
     else:
         raise ValueError("Unknown service")
 

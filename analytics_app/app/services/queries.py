@@ -4,6 +4,8 @@ from analytics_app.app.db import settings
 from analytics_app.app.schemas.analytics import Period, Service
 from analytics_app.app.models import (
     Events,
+    CbtbaseEvent,
+    CbtbaseUser,
     FarmaEvent,
     FarmaUser,
     PaymentEvent,
@@ -36,6 +38,12 @@ SERVICE_QUERY_CONFIG = {
         "event_model": SfbtEvent,
         "payment_user_fk": "sfbt_user_id",
         "file_event_name": settings.SFBT_FILE_EVENT,
+    },
+    Service.CBTBASE: {
+        "user_model": CbtbaseUser,
+        "event_model": CbtbaseEvent,
+        "payment_user_fk": "cbtbase_user_id",
+        "file_event_name": settings.CBTBASE_FILE_EVENT,
     },
 }
 

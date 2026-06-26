@@ -10,6 +10,8 @@ from analytics_app.app.models.enums import (
 )
 
 from analytics_app.app.models.users import (
+    CbtbaseEvent,
+    CbtbaseUser,
     Events,
     FarmaEvent,
     FarmaUser,
@@ -42,6 +44,8 @@ __all__ = [
     "FarmaEvent",
     "SfbtUser",
     "SfbtEvent",
+    "CbtbaseUser",
+    "CbtbaseEvent",
     "TrackedSheet",
     "PaymentEvent",
     "TelegramTemplate",

@@ -30,6 +30,8 @@ def get_bot_token_by_service(service: Service) -> str | None:
         return settings.FARMA_BOT_TOKEN.get_secret_value()
     if service == Service.SFBT:
         return settings.SFBT_BOT_TOKEN.get_secret_value()
+    if service == Service.CBTBASE and settings.CBTBASE_BOT_TOKEN is not None:
+        return settings.CBTBASE_BOT_TOKEN.get_secret_value()
     return None
 
 
