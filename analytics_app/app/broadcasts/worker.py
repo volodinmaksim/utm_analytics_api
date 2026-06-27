@@ -14,24 +14,38 @@ from analytics_app.app.broadcasts.repository import (
     mark_recipient_skipped,
     mark_broadcast_failed,
     release_processing_recipients_for_broadcast,
+    release_stale_processing_recipients,
     get_processable_broadcasts,
 )
 from analytics_app.app.broadcasts.sender import send_telegram_template_to_chat
 from analytics_app.app.schemas import Service
 from analytics_app.app.models import BroadcastStatus
 
-RECIPIENT_BATCH_LIMIT = 50
+RECIPIENT_BATCH_LIMIT = 10
 MAX_ATTEMPTS = 5
 RETRY_DELAY_SECONDS = 30
+STALE_PROCESSING_SECONDS = 10 * 60
+
+
+def _error_text(exc: Exception, fallback: str) -> str:
+    message = str(exc).strip()
+    if message:
+        return message
+    return f"{fallback}: {exc.__class__.__name__}"
 
 
 async def process_broadcasts(
     session: AsyncSession,
     *,
-    limit: int,
     worker_id: str,
 ) -> None:
-    broadcasts = await get_processable_broadcasts(session, limit=limit)
+    await release_stale_processing_recipients(
+        session,
+        stale_after_seconds=STALE_PROCESSING_SECONDS,
+    )
+    await session.commit()
+
+    broadcasts = await get_processable_broadcasts(session, limit=1)
     for broadcast in broadcasts:
         if broadcast.status == BroadcastStatus.SCHEDULED:
             broadcast = await try_mark_broadcast_sending(
@@ -75,14 +89,14 @@ async def process_broadcasts(
                     await mark_recipient_skipped(
                         session,
                         recipient_id=recipient.id,
-                        error=str(exc),
+                        error=_error_text(exc, "recipient skipped"),
                     )
                     await session.commit()
                 except TelegramTemporaryError as exc:
                     await mark_recipient_failed_or_retry(
                         session,
                         recipient_id=recipient.id,
-                        error=str(exc),
+                        error=_error_text(exc, "temporary telegram error"),
                         max_attempts=MAX_ATTEMPTS,
                         retry_delay_seconds=RETRY_DELAY_SECONDS,
                     )
@@ -92,7 +106,7 @@ async def process_broadcasts(
                     await mark_broadcast_failed(
                         session,
                         broadcast_id=broadcast.id,
-                        error=str(exc),
+                        error=_error_text(exc, "template send error"),
                     )
                     await release_processing_recipients_for_broadcast(
                         session,

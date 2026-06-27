@@ -45,7 +45,7 @@ def check_telegram_response(response: httpx.Response) -> dict:
         return data
 
     error_code = data.get("error_code", response.status_code)
-    description = str(data.get("description", ""))
+    description = str(data.get("description", "") or "")
     description_lower = description.lower()
 
     if (
@@ -53,12 +53,23 @@ def check_telegram_response(response: httpx.Response) -> dict:
         or "bot was blocked" in description_lower
         or "chat not found" in description_lower
     ):
-        raise TelegramRecipientSkipped(description)
+        raise TelegramRecipientSkipped(
+            description or f"Telegram returned {error_code} for recipient"
+        )
 
     if error_code == 429 or error_code >= 500:
-        raise TelegramTemporaryError(description)
+        raise TelegramTemporaryError(
+            description or f"Telegram temporary error {error_code}"
+        )
 
-    raise TelegramTemporaryError(description)
+    raise TelegramTemporaryError(description or f"Telegram error {error_code}")
+
+
+def describe_network_error(action: str, exc: Exception) -> str:
+    message = str(exc).strip()
+    if message:
+        return f"{action}: {exc.__class__.__name__}: {message}"
+    return f"{action}: {exc.__class__.__name__}"
 
 
 async def send_telegram_template_to_chat(
@@ -97,7 +108,9 @@ async def send_telegram_template_to_chat(
                     },
                 )
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
-                raise TelegramTemporaryError(str(exc)) from exc
+                raise TelegramTemporaryError(
+                    describe_network_error("copyMessage request failed", exc)
+                ) from exc
 
             data = check_telegram_response(response)
             sent_message_id = data["result"]["message_id"]
@@ -120,7 +133,9 @@ async def send_telegram_template_to_chat(
                     },
                 )
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
-                raise TelegramTemporaryError(str(exc)) from exc
+                raise TelegramTemporaryError(
+                    describe_network_error("copyMessages request failed", exc)
+                ) from exc
 
             data = check_telegram_response(response)
             sent_message_ids = [item["message_id"] for item in data["result"]]

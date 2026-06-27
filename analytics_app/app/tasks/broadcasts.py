@@ -9,7 +9,6 @@ from analytics_app.app.db import get_session_factory
 from analytics_app.app.broadcasts.worker import process_broadcasts
 from analytics_app.app.tasks.celery_app import celery_app
 
-BROADCASTS_LIMIT = 10
 FINALIZE_TEMPLATES_LIMIT = 50
 
 _loop = None
@@ -37,7 +36,6 @@ async def _process_broadcasts() -> None:
     async with session_factory() as session:
         await process_broadcasts(
             session,
-            limit=BROADCASTS_LIMIT,
             worker_id=worker_id,
         )
 

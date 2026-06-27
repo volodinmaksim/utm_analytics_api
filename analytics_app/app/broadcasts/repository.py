@@ -556,6 +556,29 @@ async def release_processing_recipients_for_broadcast(
     await session.flush()
 
 
+async def release_stale_processing_recipients(
+    session: AsyncSession,
+    *,
+    stale_after_seconds: int,
+) -> int:
+    stale_before = datetime.now(timezone.utc) - timedelta(seconds=stale_after_seconds)
+    stmt = (
+        update(BroadcastRecipient)
+        .where(BroadcastRecipient.status == BroadcastRecipientStatus.PROCESSING)
+        .where(BroadcastRecipient.locked_at.is_not(None))
+        .where(BroadcastRecipient.locked_at < stale_before)
+        .values(
+            status=BroadcastRecipientStatus.PENDING,
+            locked_at=None,
+            locked_by=None,
+            next_attempt_at=None,
+        )
+    )
+    result = await session.execute(stmt)
+    await session.flush()
+    return int(result.rowcount or 0)
+
+
 async def get_processable_broadcasts(
     session: AsyncSession,
     *,
