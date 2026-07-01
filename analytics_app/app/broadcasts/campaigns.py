@@ -13,6 +13,8 @@ from analytics_app.app.broadcasts.repository import (
     get_broadcast_status_summary,
     get_broadcast_error_summary,
     get_broadcast_with_counts_by_id,
+    list_event_audience_options,
+    list_utm_audience_options,
 )
 from analytics_app.app.models import TelegramTemplateStatus, BroadcastStatus
 from analytics_app.app.schemas import (
@@ -23,6 +25,8 @@ from analytics_app.app.schemas import (
     AdminBroadcastListRow,
     AdminBroadcastCancelResponse,
     BroadcastStatus as BroadcastSchemaStatus,
+    BroadcastAudienceOptionsResponse,
+    BroadcastAudienceOption,
 )
 from analytics_app.app.schemas.broadcasts import (
     AdminBroadcastDetailResponse,
@@ -31,6 +35,14 @@ from analytics_app.app.schemas.broadcasts import (
     BroadcastRecipientStatusSummary,
     BroadcastRecipientErrorSummary,
 )
+from analytics_app.app.services.analytics import (
+    FUNNEL_LABELS,
+    SERVICE_CONTENT_EVENT_LABELS,
+    SERVICE_FUNNEL_EVENTS,
+)
+
+FILE_EVENT_PREFIX = "Получить файл:"
+TECHNICAL_EVENT_MARKERS = ("_scheduled:",)
 
 
 async def create_admin_broadcast(
@@ -57,6 +69,8 @@ async def create_admin_broadcast(
         audience_type=audience_type,
         audience_filter=audience_filter,
     )
+    if not target_tg_ids:
+        raise ValueError("Audience is empty")
 
     broadcast = await create_broadcast(
         session,
@@ -145,6 +159,70 @@ async def cancel_admin_broadcast(
     )
 
 
+def get_event_label_map(service: Service) -> dict[str, str]:
+    labels: dict[str, str] = {}
+    for key, event_name in SERVICE_FUNNEL_EVENTS.get(service, ()):
+        labels[event_name] = FUNNEL_LABELS.get(key, event_name)
+    labels.update(SERVICE_CONTENT_EVENT_LABELS.get(service, {}))
+    return labels
+
+
+def is_file_received_event(event_name: str) -> bool:
+    return event_name.strip().startswith(FILE_EVENT_PREFIX)
+
+
+def format_file_received_event_label(event_name: str) -> str:
+    file_name = event_name.strip()[len(FILE_EVENT_PREFIX) :].strip()
+    return f"Получили файл: {file_name}" if file_name else "Получили файл"
+
+
+def is_technical_event(event_name: str) -> bool:
+    return any(marker in event_name for marker in TECHNICAL_EVENT_MARKERS)
+
+
+async def get_admin_broadcast_audience_options(
+    session: AsyncSession,
+    *,
+    service: Service,
+) -> BroadcastAudienceOptionsResponse:
+    utm_rows = await list_utm_audience_options(session, service=service)
+    event_rows = await list_event_audience_options(session, service=service)
+    event_labels = get_event_label_map(service)
+
+    utm_marks = [
+        BroadcastAudienceOption(
+            value=utm_mark,
+            label=utm_mark,
+            count=count,
+        )
+        for utm_mark, count in utm_rows
+    ]
+    events: list[BroadcastAudienceOption] = []
+    for event_name, count in event_rows:
+        if is_technical_event(event_name):
+            continue
+        if is_file_received_event(event_name):
+            label = format_file_received_event_label(event_name)
+        elif event_name in event_labels:
+            label = event_labels[event_name]
+        else:
+            continue
+
+        events.append(
+            BroadcastAudienceOption(
+                value=event_name,
+                label=label,
+                count=count,
+            )
+        )
+    events.sort(key=lambda item: item.label.lower())
+
+    return BroadcastAudienceOptionsResponse(
+        utm_marks=utm_marks,
+        events=events,
+    )
+
+
 def format_audience_label(
     audience_type: AudienceType,
     audience_filter: dict,
@@ -156,7 +234,11 @@ def format_audience_label(
         return f"UTM: {value}" if value else "UTM"
     if audience_type == AudienceType.EVENT:
         value = audience_filter.get("event_name")
-        return f"Событие: {value}" if value else "Событие"
+        if not value:
+            return "Событие"
+        if is_file_received_event(str(value)):
+            return format_file_received_event_label(str(value))
+        return f"Событие: {value}"
     return audience_type.value
 
 

@@ -108,6 +108,18 @@ class AdminBroadcastCancelResponse(BaseModel):
     status: BroadcastStatus
 
 
+class BroadcastAudienceOption(BaseModel):
+    value: str
+    label: str
+    count: int
+    is_known: bool = True
+
+
+class BroadcastAudienceOptionsResponse(BaseModel):
+    utm_marks: list[BroadcastAudienceOption]
+    events: list[BroadcastAudienceOption]
+
+
 class TelegramTemplateIngestRequest(BaseModel):
     service: Service | None = None
     message: dict[str, Any]

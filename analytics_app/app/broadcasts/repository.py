@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from sqlalchemy import select, case, func, Row, or_, update, and_
+from sqlalchemy import select, case, func, Row, or_, update, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,6 +16,10 @@ from analytics_app.app.models import (
     FarmaUser,
     CbtbaseUser,
     SfbtUser,
+    Events,
+    FarmaEvent,
+    SfbtEvent,
+    CbtbaseEvent,
 )
 from analytics_app.app.schemas import (
     TelegramTemplateKind,
@@ -219,20 +223,117 @@ async def get_all_user_tg_ids_by_service(
     *,
     service: Service,
 ) -> list[int]:
-    if service == Service.RPP:
-        user_model = User
-    elif service == Service.FARMA:
-        user_model = FarmaUser
-    elif service == Service.SFBT:
-        user_model = SfbtUser
-    elif service == Service.CBTBASE:
-        user_model = CbtbaseUser
-    else:
-        raise ValueError("Unknown service")
+    user_model = get_user_model_by_service(service)
 
     stmt = select(user_model.tg_id).order_by(user_model.tg_id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+def get_user_model_by_service(service: Service):
+    if service == Service.RPP:
+        return User
+    elif service == Service.FARMA:
+        return FarmaUser
+    elif service == Service.SFBT:
+        return SfbtUser
+    elif service == Service.CBTBASE:
+        return CbtbaseUser
+    raise ValueError("Unknown service")
+
+
+def get_event_model_by_service(service: Service):
+    if service == Service.RPP:
+        return Events
+    elif service == Service.FARMA:
+        return FarmaEvent
+    elif service == Service.SFBT:
+        return SfbtEvent
+    elif service == Service.CBTBASE:
+        return CbtbaseEvent
+    raise ValueError("Unknown service")
+
+
+async def get_user_tg_ids_by_utm(
+    session: AsyncSession,
+    *,
+    service: Service,
+    utm_mark: str,
+) -> list[int]:
+    user_model = get_user_model_by_service(service)
+    normalized_utm = utm_mark.strip()
+
+    stmt = (
+        select(user_model.tg_id)
+        .where(func.btrim(user_model.utm_mark) == normalized_utm)
+        .order_by(user_model.tg_id)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_user_tg_ids_by_event(
+    session: AsyncSession,
+    *,
+    service: Service,
+    event_name: str,
+) -> list[int]:
+    user_model = get_user_model_by_service(service)
+    event_model = get_event_model_by_service(service)
+    normalized_event = event_name.strip()
+
+    stmt = (
+        select(user_model.tg_id)
+        .join(event_model, event_model.user_id == user_model.id)
+        .where(event_model.event_name == normalized_event)
+        .distinct()
+        .order_by(user_model.tg_id)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def list_utm_audience_options(
+    session: AsyncSession,
+    *,
+    service: Service,
+) -> Sequence[Row]:
+    user_model = get_user_model_by_service(service)
+    normalized_utm = func.btrim(user_model.utm_mark).label("utm_mark")
+
+    stmt = (
+        select(
+            normalized_utm,
+            func.count(user_model.id).label("users"),
+        )
+        .where(user_model.utm_mark.is_not(None))
+        .where(func.btrim(user_model.utm_mark) != "")
+        .group_by(normalized_utm)
+        .order_by(text("users DESC"), text("utm_mark ASC"))
+    )
+    result = await session.execute(stmt)
+    return result.all()
+
+
+async def list_event_audience_options(
+    session: AsyncSession,
+    *,
+    service: Service,
+) -> Sequence[Row]:
+    user_model = get_user_model_by_service(service)
+    event_model = get_event_model_by_service(service)
+
+    stmt = (
+        select(
+            event_model.event_name,
+            func.count(func.distinct(user_model.id)).label("users"),
+        )
+        .join(user_model, user_model.id == event_model.user_id)
+        .group_by(event_model.event_name)
+        .order_by(text("users DESC"), event_model.event_name.asc())
+    )
+    result = await session.execute(stmt)
+    return result.all()
 
 
 async def list_broadcasts_with_counts(

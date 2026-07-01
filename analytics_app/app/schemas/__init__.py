@@ -34,6 +34,8 @@ from analytics_app.app.schemas.broadcasts import (
     AdminTelegramTemplateListRow,
     AdminTelegramTemplateSendTestResponse,
     AudienceType,
+    BroadcastAudienceOptionsResponse,
+    BroadcastAudienceOption,
     BroadcastStatus,
     TelegramTemplateKind,
 )
@@ -63,6 +65,8 @@ __all__ = [
     "AdminTelegramTemplateListRow",
     "AdminTelegramTemplateSendTestResponse",
     "AudienceType",
+    "BroadcastAudienceOptionsResponse",
+    "BroadcastAudienceOption",
     "BroadcastStatus",
     "ContentEventRow",
     "ContentResponse",

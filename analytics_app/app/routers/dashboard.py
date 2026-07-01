@@ -22,6 +22,7 @@ from analytics_app.app.broadcasts.campaigns import (
     get_admin_broadcasts_list,
     cancel_admin_broadcast,
     get_admin_broadcast_detail,
+    get_admin_broadcast_audience_options,
 )
 from analytics_app.app.broadcasts.templates import (
     get_list_admin_telegram_templates,
@@ -70,6 +71,7 @@ from analytics_app.app.schemas.broadcasts import (
     AdminBroadcastListResponse,
     AdminBroadcastCancelResponse,
     AdminBroadcastDetailResponse,
+    BroadcastAudienceOptionsResponse,
 )
 from analytics_app.app.services.analytics import (
     get_audience,
@@ -238,14 +240,17 @@ async def admin_create_broadcast(
     session: SessionDep,
     data: AdminBroadcastCreateRequest,
 ) -> AdminBroadcastResponse:
-    return await create_admin_broadcast(
-        session,
-        service=data.service,
-        template_id=data.template_id,
-        audience_type=data.audience_type,
-        audience_filter=data.audience_filter,
-        scheduled_at=data.scheduled_at,
-    )
+    try:
+        return await create_admin_broadcast(
+            session,
+            service=data.service,
+            template_id=data.template_id,
+            audience_type=data.audience_type,
+            audience_filter=data.audience_filter,
+            scheduled_at=data.scheduled_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get(
@@ -258,6 +263,18 @@ async def admin_get_broadcasts(
     limit: int = Query(default=20, ge=1, le=100),
 ) -> AdminBroadcastListResponse:
     return await get_admin_broadcasts_list(session, limit=limit)
+
+
+@router.get(
+    "/api/admin/broadcast-audience-options",
+    response_model=BroadcastAudienceOptionsResponse,
+)
+async def admin_get_broadcast_audience_options(
+    _admin: AdminApiDep,
+    session: SessionDep,
+    service: Service,
+) -> BroadcastAudienceOptionsResponse:
+    return await get_admin_broadcast_audience_options(session, service=service)
 
 
 @router.post(

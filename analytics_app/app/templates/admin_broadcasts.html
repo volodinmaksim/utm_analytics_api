@@ -174,9 +174,23 @@
                 <select id="audience" name="audience_type"
                   class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10">
                   <option value="all">all — все получатели</option>
+                  <option value="utm">utm — по UTM метке</option>
+                  <option value="event">event — по событию</option>
                 </select>
                 <i data-lucide="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
               </div>
+            </div>
+
+            <div id="audienceFilterWrap" class="hidden">
+              <label id="audienceFilterLabel" for="audienceFilterValue" class="mb-1.5 block text-xs font-medium text-slate-500">Фильтр аудитории</label>
+              <div class="relative">
+                <select id="audienceFilterValue" name="audience_filter_value"
+                  class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10">
+                  <option value="">Выберите аудиторию</option>
+                </select>
+                <i data-lucide="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+              </div>
+              <p id="audienceFilterHint" class="mt-1 text-xs text-slate-400"></p>
             </div>
 
             <div>
@@ -252,6 +266,7 @@
     detail:    (id) => `/api/admin/broadcasts/${id}`,
     create:    () => `/api/admin/broadcasts`,
     cancel:    (id) => `/api/admin/broadcasts/${id}/cancel`,
+    audienceOptions: (service) => `/api/admin/broadcast-audience-options?service=${encodeURIComponent(service)}`,
   };
   const LOGIN_URL = "/admin/login";
   const TPL_STEP = 8;
@@ -263,6 +278,7 @@
   let tplHasMore = true;
   let selected = null;        // selected template object
   let autoTimer = null;
+  let audienceOptionsCache = {};
 
   // ── tiny dom helpers ────────────────────────────────────────────────────
   const $ = (s) => document.querySelector(s);
@@ -504,15 +520,110 @@
     box.classList.remove("hidden"); icons();
   }
 
+  function renderAudienceFilterOptions(type, options) {
+    const input = $("#audienceFilterValue");
+    const items = type === "utm" ? (options?.utm_marks || []) : (options?.events || []);
+
+    if (!items.length) {
+      input.innerHTML = `<option value="">Нет доступных вариантов</option>`;
+      input.disabled = true;
+      return;
+    }
+
+    input.disabled = false;
+    input.innerHTML = `<option value="">Выберите аудиторию</option>` + items.map((item) => {
+      const raw = item.value && item.value !== item.label ? ` · ${item.value}` : "";
+      const known = item.is_known === false ? " · raw" : "";
+      return `<option value="${esc(item.value)}">${esc(item.label)} · ${nf.format(+item.count || 0)} чел.${esc(raw)}${known}</option>`;
+    }).join("");
+  }
+
+  async function loadAudienceOptions() {
+    const service = $("#service").value;
+    if (!audienceOptionsCache[service]) {
+      audienceOptionsCache[service] = await api(API.audienceOptions(service));
+    }
+    return audienceOptionsCache[service];
+  }
+
+  async function updateAudienceFilterControls() {
+    const type = $("#audience").value;
+    const wrap = $("#audienceFilterWrap");
+    const input = $("#audienceFilterValue");
+    const label = $("#audienceFilterLabel");
+    const hint = $("#audienceFilterHint");
+
+    input.disabled = false;
+
+    if (type === "utm") {
+      wrap.classList.remove("hidden");
+      label.textContent = "UTM метка";
+      input.innerHTML = `<option value="">Загрузка...</option>`;
+      hint.textContent = "Получат только пользователи выбранного сервиса с выбранной utm_mark.";
+      try {
+        renderAudienceFilterOptions(type, await loadAudienceOptions());
+      } catch (err) {
+        input.innerHTML = `<option value="">Не удалось загрузить UTM</option>`;
+        input.disabled = true;
+        hint.textContent = err.message || "Не удалось загрузить список UTM меток.";
+      }
+      return;
+    }
+
+    if (type === "event") {
+      wrap.classList.remove("hidden");
+      label.textContent = "Событие";
+      input.innerHTML = `<option value="">Загрузка...</option>`;
+      hint.textContent = "Получат только пользователи выбранного сервиса, у которых было выбранное событие.";
+      try {
+        renderAudienceFilterOptions(type, await loadAudienceOptions());
+      } catch (err) {
+        input.innerHTML = `<option value="">Не удалось загрузить события</option>`;
+        input.disabled = true;
+        hint.textContent = err.message || "Не удалось загрузить список событий.";
+      }
+      return;
+    }
+
+    wrap.classList.add("hidden");
+    input.value = "";
+    input.innerHTML = `<option value="">Выберите аудиторию</option>`;
+    hint.textContent = "";
+  }
+
+  function buildAudienceFilter() {
+    const type = $("#audience").value;
+    const value = $("#audienceFilterValue").value.trim();
+
+    if (type === "utm") {
+      if (!value) throw new Error("Введите UTM метку");
+      return { utm_mark: value };
+    }
+
+    if (type === "event") {
+      if (!value) throw new Error("Введите название события");
+      return { event_name: value };
+    }
+
+    return {};
+  }
+
   async function createBroadcast(e) {
     e.preventDefault();
     if (!selected) { formMsg("error", "Сначала выберите шаблон"); return; }
     const btn = $("#createBtn");
+    let audienceFilter;
+    try {
+      audienceFilter = buildAudienceFilter();
+    } catch (err) {
+      formMsg("error", err.message);
+      return;
+    }
     const payload = {
       template_id: selected.id,
       service: $("#service").value,
       audience_type: $("#audience").value,
-      audience_filter: {},
+      audience_filter: audienceFilter,
       scheduled_at: new Date($("#scheduled_at").value).toISOString(),
     };
     btn.disabled = true;
@@ -801,6 +912,8 @@
   $("#tplMore").addEventListener("click", () => { if (!tplHasMore) return; tplLimit += TPL_STEP; loadTemplates(); });
   $("#bcRefresh").addEventListener("click", (e) => { spin(e.currentTarget, true); loadBroadcasts(false).finally(() => { spin(e.currentTarget, false); icons(); }); });
   $("#createForm").addEventListener("submit", createBroadcast);
+  $("#audience").addEventListener("change", updateAudienceFilterControls);
+  $("#service").addEventListener("change", updateAudienceFilterControls);
   $("#bcDetailClose").addEventListener("click", closeBroadcastDetailModal);
   $("#bcDetailBackdrop").addEventListener("click", closeBroadcastDetailModal);
   document.addEventListener("keydown", (e) => {
@@ -809,6 +922,7 @@
 
   // ── init ────────────────────────────────────────────────────────────────
   setDefaultSchedule();
+  updateAudienceFilterControls();
   icons();
   loadTemplates();
   loadBroadcasts(true);
