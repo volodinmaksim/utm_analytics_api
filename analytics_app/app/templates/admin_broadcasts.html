@@ -206,6 +206,24 @@
   </div>
 </main>
 
+<!-- Broadcast detail drawer -->
+<div id="bcDetailModal" class="fixed inset-0 z-40 hidden">
+  <div id="bcDetailBackdrop" class="absolute inset-0 bg-slate-900/35"></div>
+  <aside class="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
+    <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+      <div class="min-w-0">
+        <h2 id="bcDetailTitle" class="truncate text-base font-semibold tracking-tight text-slate-900">Рассылка</h2>
+        <p id="bcDetailMeta" class="mt-0.5 truncate text-xs text-slate-400">-</p>
+      </div>
+      <button id="bcDetailClose" type="button" title="Закрыть"
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
+        <i data-lucide="x" class="h-4 w-4"></i>
+      </button>
+    </div>
+    <div id="bcDetailBody" class="scroll-area flex-1 overflow-y-auto px-5 py-4"></div>
+  </aside>
+</div>
+
 <!-- toast region -->
 <div id="toasts" class="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4"></div>
 
@@ -219,6 +237,7 @@
     templates: (limit) => `/api/admin/telegram-templates?limit=${limit}`,
     sendTest:  (id) => `/api/admin/telegram-templates/${id}/send-test`,
     broadcasts:(limit) => `/api/admin/broadcasts?limit=${limit}`,
+    detail:    (id) => `/api/admin/broadcasts/${id}`,
     create:    () => `/api/admin/broadcasts`,
     cancel:    (id) => `/api/admin/broadcasts/${id}/cancel`,
   };
@@ -549,6 +568,117 @@
       <span class="h-1.5 w-1.5 rounded-full ${colors[s] || "bg-slate-300"}"></span>${esc(s)}</span>`;
   }
 
+  function openBroadcastDetailModal() {
+    $("#bcDetailModal").classList.remove("hidden");
+    document.body.classList.add("overflow-hidden");
+    icons();
+  }
+
+  function closeBroadcastDetailModal() {
+    $("#bcDetailModal").classList.add("hidden");
+    document.body.classList.remove("overflow-hidden");
+  }
+
+  function detailSummaryRows(items, emptyText, getLabel) {
+    if (!items || !items.length) {
+      return `<div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-400">${esc(emptyText)}</div>`;
+    }
+    return `<div class="overflow-hidden rounded-xl border border-slate-200">
+      ${items.map((item) => `
+        <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-sm last:border-b-0">
+          <span class="min-w-0 break-words text-slate-600">${esc(getLabel(item))}</span>
+          <span class="shrink-0 font-semibold text-slate-900">${nf.format(+item.count || 0)}</span>
+        </div>
+      `).join("")}
+    </div>`;
+  }
+
+  function detailSection(title, body) {
+    return `<section>
+      <h3 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">${esc(title)}</h3>
+      ${body}
+    </section>`;
+  }
+
+  function renderBroadcastDetail(detail) {
+    const template = detail.template || {};
+    const audience = detail.audience || {};
+    $("#bcDetailTitle").textContent = `Рассылка #${detail.id}`;
+    $("#bcDetailMeta").textContent = `${detail.service || "-"} · ${detail.status || "-"} · ${fmtFull(detail.scheduled_at)}`;
+
+    const lastError = detail.last_error
+      ? detailSection("Ошибка рассылки", `
+          <div class="rounded-xl bg-rose-50 px-3 py-3 text-sm text-rose-700 ring-1 ring-rose-200/70">
+            <div class="break-words">${esc(detail.last_error)}</div>
+          </div>`)
+      : "";
+
+    const templateText = template.preview_text && String(template.preview_text).trim()
+      ? esc(template.preview_text)
+      : '<span class="italic text-slate-400">Без текста</span>';
+
+    const audienceFilter = audience.audience_filter && Object.keys(audience.audience_filter).length
+      ? `<pre class="mt-2 overflow-x-auto rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">${esc(JSON.stringify(audience.audience_filter, null, 2))}</pre>`
+      : "";
+
+    $("#bcDetailBody").innerHTML = `
+      <div class="flex flex-col gap-5">
+        ${lastError}
+
+        ${detailSection("Сообщение", `
+          <div class="rounded-xl border border-slate-200 px-3 py-3">
+            <div class="mb-2 flex flex-wrap items-center gap-1.5">
+              <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">#${esc(template.id || detail.template_id)}</span>
+              ${kindBadge(template.kind)}
+              <span class="text-xs text-slate-400">${esc(template.items_count || 0)} эл.</span>
+            </div>
+            <div class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">${templateText}</div>
+          </div>`)}
+
+        ${detailSection("Аудитория", `
+          <div class="rounded-xl border border-slate-200 px-3 py-3 text-sm">
+            <div class="font-medium text-slate-800">${esc(audience.label || detail.audience_type || "-")}</div>
+            <div class="mt-1 text-xs text-slate-400">${esc(audience.audience_type || detail.audience_type || "-")}</div>
+            ${audienceFilter}
+          </div>`)}
+
+        ${detailSection("Прогресс", `
+          <div class="rounded-xl border border-slate-200 px-3 py-3">
+            ${progressCell(detail)}
+          </div>`)}
+
+        ${detailSection("Статусы", detailSummaryRows(
+          detail.status_summary,
+          "Нет данных",
+          (item) => item.status || "-"
+        ))}
+
+        ${detailSection("Ошибки и причины", detailSummaryRows(
+          detail.error_summary,
+          "Ошибок нет",
+          (item) => item.reason || item.status || "-"
+        ))}
+      </div>`;
+    icons();
+  }
+
+  async function openBroadcastDetail(b) {
+    openBroadcastDetailModal();
+    $("#bcDetailTitle").textContent = `Рассылка #${b.id}`;
+    $("#bcDetailMeta").textContent = "Загрузка...";
+    $("#bcDetailBody").innerHTML = `<div class="skeleton h-28 rounded-xl"></div>`;
+    try {
+      const detail = await api(API.detail(b.id));
+      renderBroadcastDetail(detail);
+    } catch (e) {
+      $("#bcDetailBody").innerHTML = `
+        <div class="rounded-xl bg-rose-50 px-3 py-3 text-sm text-rose-700 ring-1 ring-rose-200/70">
+          ${esc(e.message || "Не удалось загрузить детали")}
+        </div>`;
+      icons();
+    }
+  }
+
   function bcSkeleton() {
     const tb = $("#bcTable"); tb.innerHTML = "";
     for (let i = 0; i < 5; i++) {
@@ -574,7 +704,7 @@
     }
     items.forEach((b) => {
       // table row
-      const tr = el("tr", "transition hover:bg-slate-50/70");
+      const tr = el("tr", "cursor-pointer transition hover:bg-slate-50/70");
       tr.innerHTML = `
         <td class="px-5 py-3.5 font-semibold text-slate-900">#${esc(b.id)}</td>
         <td class="px-3 py-3.5">${serviceChip(b.service)}</td>
@@ -582,12 +712,16 @@
         <td class="px-3 py-3.5 whitespace-nowrap text-slate-500">${fmtFull(b.scheduled_at)}</td>
         <td class="px-3 py-3.5">${progressCell(b)}</td>
         <td class="px-5 py-3.5 text-right">${cancelBtn(b)}</td>`;
+      tr.addEventListener("click", () => openBroadcastDetail(b));
       const cb = tr.querySelector('[data-act="cancel"]');
-      if (cb) cb.addEventListener("click", (e) => cancelBroadcast(b, e.currentTarget));
+      if (cb) cb.addEventListener("click", (e) => {
+        e.stopPropagation();
+        cancelBroadcast(b, e.currentTarget);
+      });
       tb.appendChild(tr);
 
       // mobile card
-      const card = el("div", "px-5 py-4");
+      const card = el("div", "cursor-pointer px-5 py-4 transition hover:bg-slate-50/70");
       card.innerHTML = `
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
@@ -599,8 +733,12 @@
         <div class="mt-2 text-xs text-slate-400">${fmtFull(b.scheduled_at)}</div>
         <div class="mt-2.5">${progressCell(b)}</div>
         <div class="mt-3">${cancelBtn(b)}</div>`;
+      card.addEventListener("click", () => openBroadcastDetail(b));
       const cb2 = card.querySelector('[data-act="cancel"]');
-      if (cb2) cb2.addEventListener("click", (e) => cancelBroadcast(b, e.currentTarget));
+      if (cb2) cb2.addEventListener("click", (e) => {
+        e.stopPropagation();
+        cancelBroadcast(b, e.currentTarget);
+      });
       cards.appendChild(card);
     });
     icons();
@@ -651,6 +789,11 @@
   $("#tplMore").addEventListener("click", () => { if (!tplHasMore) return; tplLimit += TPL_STEP; loadTemplates(); });
   $("#bcRefresh").addEventListener("click", (e) => { spin(e.currentTarget, true); loadBroadcasts(false).finally(() => { spin(e.currentTarget, false); icons(); }); });
   $("#createForm").addEventListener("submit", createBroadcast);
+  $("#bcDetailClose").addEventListener("click", closeBroadcastDetailModal);
+  $("#bcDetailBackdrop").addEventListener("click", closeBroadcastDetailModal);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("#bcDetailModal").classList.contains("hidden")) closeBroadcastDetailModal();
+  });
 
   // ── init ────────────────────────────────────────────────────────────────
   setDefaultSchedule();

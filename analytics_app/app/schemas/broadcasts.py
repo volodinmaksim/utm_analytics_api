@@ -117,3 +117,39 @@ class TelegramTemplateIngestResponse(BaseModel):
     template_id: int
     status: TelegramTemplateStatus
     items_count: int
+
+
+class BroadcastRecipientStatusSummary(BaseModel):
+    status: BroadcastRecipientStatus
+    count: int
+
+
+class BroadcastRecipientErrorSummary(BaseModel):
+    status: BroadcastRecipientStatus
+    reason: str
+    count: int
+
+
+class BroadcastTemplateSummary(BaseModel):
+    id: int
+    kind: TelegramTemplateKind
+    preview_text: str | None = None
+    items_count: int
+
+
+class BroadcastAudienceSummary(BaseModel):
+    audience_type: AudienceType
+    audience_filter: dict[str, Any]
+    label: str
+
+
+class AdminBroadcastDetailResponse(AdminBroadcastListRow):
+    last_error: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+    template: BroadcastTemplateSummary
+    audience: BroadcastAudienceSummary
+
+    status_summary: list[BroadcastRecipientStatusSummary]
+    error_summary: list[BroadcastRecipientErrorSummary]

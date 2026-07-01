@@ -21,15 +21,24 @@ from analytics_app.app.broadcasts.campaigns import (
     create_admin_broadcast,
     get_admin_broadcasts_list,
     cancel_admin_broadcast,
+    get_admin_broadcast_detail,
+)
+from analytics_app.app.broadcasts.templates import (
+    get_list_admin_telegram_templates,
+    send_test_template_to_admin,
 )
 from analytics_app.app.clients.google_sheets import (
     GoogleSheetsConfigurationError,
     GoogleSheetsReadError,
 )
 from analytics_app.app.db import get_session, settings
-from analytics_app.app.broadcasts.templates import (
-    get_list_admin_telegram_templates,
-    send_test_template_to_admin,
+from analytics_app.app.models import TrackedSheet
+from analytics_app.app.payments.sync import sync_tracked_sheet_by_id
+from analytics_app.app.payments.tracked_sheets import (
+    normalize_spreadsheet_source,
+    to_service_type,
+    to_tracked_sheet_response,
+    validate_tracked_sheet_access,
 )
 from analytics_app.app.schemas import (
     AdminTelegramTemplateListResponse,
@@ -54,20 +63,13 @@ from analytics_app.app.schemas import (
     WishesResponse,
     AdminTelegramTemplateSendTestResponse,
 )
-from analytics_app.app.models import TrackedSheet
-from analytics_app.app.payments.sync import sync_tracked_sheet_by_id
-from analytics_app.app.payments.tracked_sheets import (
-    normalize_spreadsheet_source,
-    to_service_type,
-    to_tracked_sheet_response,
-    validate_tracked_sheet_access,
-)
 from analytics_app.app.schemas.broadcasts import (
     AdminTelegramTemplateSendTestRequest,
     AdminBroadcastResponse,
     AdminBroadcastCreateRequest,
     AdminBroadcastListResponse,
     AdminBroadcastCancelResponse,
+    AdminBroadcastDetailResponse,
 )
 from analytics_app.app.services.analytics import (
     get_audience,
@@ -268,6 +270,17 @@ async def cancel_broadcast_by_id(
     broadcast_id: int,
 ) -> AdminBroadcastCancelResponse:
     return await cancel_admin_broadcast(session, broadcast_id=broadcast_id)
+
+
+@router.get(
+    "/api/admin/broadcasts/{broadcast_id}", response_model=AdminBroadcastDetailResponse
+)
+async def admin_get_broadcast_detail(
+    _admin: AdminApiDep,
+    session: SessionDep,
+    broadcast_id: int,
+) -> AdminBroadcastDetailResponse:
+    return await get_admin_broadcast_detail(session, broadcast_id=broadcast_id)
 
 
 @router.post(

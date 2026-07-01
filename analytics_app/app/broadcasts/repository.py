@@ -634,3 +634,86 @@ async def mark_expired_collecting_templates_ready(
 
     await session.flush()
     return templates
+
+
+async def get_broadcast_status_summary(session: AsyncSession, *, broadcast_id: int):
+    stmt = (
+        select(BroadcastRecipient.status, func.count(BroadcastRecipient.id))
+        .where(BroadcastRecipient.broadcast_id == broadcast_id)
+        .group_by(BroadcastRecipient.status)
+        .order_by(func.count(BroadcastRecipient.id).desc())
+    )
+    result = await session.execute(stmt)
+    return result.all()
+
+
+async def get_broadcast_error_summary(session: AsyncSession, *, broadcast_id: int):
+    reason = func.nullif(BroadcastRecipient.last_error, "")
+
+    stmt = (
+        select(
+            BroadcastRecipient.status,
+            reason.label("reason"),
+            func.count(BroadcastRecipient.id),
+        )
+        .where(BroadcastRecipient.broadcast_id == broadcast_id)
+        .where(BroadcastRecipient.last_error.is_not(None))
+        .where(func.nullif(BroadcastRecipient.last_error, "").is_not(None))
+        .group_by(BroadcastRecipient.status, reason)
+        .order_by(func.count(BroadcastRecipient.id).desc())
+    )
+    result = await session.execute(stmt)
+    return result.all()
+
+
+async def get_broadcast_with_counts_by_id(
+    session: AsyncSession,
+    *,
+    broadcast_id: int,
+) -> Row | None:
+    stmt = (
+        select(
+            Broadcast,
+            func.count(BroadcastRecipient.id).label("recipients_total"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.SENT, 1),
+                    else_=0,
+                )
+            ).label("sent_count"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.PENDING, 1),
+                    else_=0,
+                )
+            ).label("pending_count"),
+            func.sum(
+                case(
+                    (
+                        BroadcastRecipient.status
+                        == BroadcastRecipientStatus.PROCESSING,
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("processing_count"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.FAILED, 1),
+                    else_=0,
+                )
+            ).label("failed_count"),
+            func.sum(
+                case(
+                    (BroadcastRecipient.status == BroadcastRecipientStatus.SKIPPED, 1),
+                    else_=0,
+                )
+            ).label("skipped_count"),
+        )
+        .options(selectinload(Broadcast.template))
+        .outerjoin(BroadcastRecipient)
+        .where(Broadcast.id == broadcast_id)
+        .group_by(Broadcast.id)
+    )
+    result = await session.execute(stmt)
+    return result.one_or_none()
