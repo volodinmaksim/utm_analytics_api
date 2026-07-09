@@ -15,11 +15,13 @@ from analytics_app.app.models import (
     User,
     FarmaUser,
     CbtbaseUser,
+    PsygastroUser,
     SfbtUser,
     Events,
     FarmaEvent,
     SfbtEvent,
     CbtbaseEvent,
+    PsygastroEvent,
 )
 from analytics_app.app.schemas import (
     TelegramTemplateKind,
@@ -239,6 +241,8 @@ def get_user_model_by_service(service: Service):
         return SfbtUser
     elif service == Service.CBTBASE:
         return CbtbaseUser
+    elif service == Service.PSYGASTRO:
+        return PsygastroUser
     raise ValueError("Unknown service")
 
 
@@ -251,6 +255,8 @@ def get_event_model_by_service(service: Service):
         return SfbtEvent
     elif service == Service.CBTBASE:
         return CbtbaseEvent
+    elif service == Service.PSYGASTRO:
+        return PsygastroEvent
     raise ValueError("Unknown service")
 
 

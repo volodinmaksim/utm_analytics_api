@@ -151,3 +151,36 @@ class CbtbaseEvent(Base):
     )
 
     user: Mapped["CbtbaseUser"] = relationship(back_populates="events")
+
+
+class PsygastroUser(Base):
+    __tablename__ = "psygastro_users"
+
+    tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(100))
+    join_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    utm_mark: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    events: Mapped[list["PsygastroEvent"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    payment_events: Mapped[list["PaymentEvent"]] = relationship(
+        back_populates="psygastro_user",
+    )
+
+
+class PsygastroEvent(Base):
+    __tablename__ = "psygastro_events"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("psygastro_users.id"), nullable=False)
+    event_name: Mapped[str] = mapped_column(Text, nullable=False)
+    timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    user: Mapped["PsygastroUser"] = relationship(back_populates="events")

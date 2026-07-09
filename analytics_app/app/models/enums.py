@@ -6,6 +6,7 @@ class ServiceType(str, Enum):
     FARMA = "farma"
     SFBT = "sfbt"
     CBTBASE = "cbtbase"
+    PSYGASTRO = "psygastro"
 
 
 class PaymentEventType(str, Enum):

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     FARMA_BOT_TOKEN: SecretStr
     SFBT_BOT_TOKEN: SecretStr
     CBTBASE_BOT_TOKEN: SecretStr | None = None
+    PSYGASTRO_BOT_TOKEN: SecretStr | None = None
 
     ADMIN_PASSWORD: SecretStr
     ADMIN_SESSION_SECRET: SecretStr
@@ -42,6 +43,7 @@ class Settings(BaseSettings):
     FARMA_FILE_EVENT: str = 'Получить файл: "Гайд по серотониновому синдрому"'
     SFBT_FILE_EVENT: str = 'Получить файл: "Пакет Опора и Ресурс"'
     CBTBASE_FILE_EVENT: str = 'Получить файл: "Протокол КПТ-сессии"'
+    PSYGASTRO_FILE_EVENT: str = 'Получить файл: "Шкала оценки тяжести симптомов СРК"'
 
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str

@@ -66,11 +66,17 @@ CBTBASE_FUNNEL_EVENTS = (
     ("file_received", settings.CBTBASE_FILE_EVENT),
 )
 
+PSYGASTRO_FUNNEL_EVENTS = (
+    ("advertising_consent", "advertising_consent"),
+    ("file_received", settings.PSYGASTRO_FILE_EVENT),
+)
+
 SERVICE_FUNNEL_EVENTS = {
     Service.RPP: RPP_FUNNEL_EVENTS,
     Service.FARMA: FARMA_FUNNEL_EVENTS,
     Service.SFBT: SFBT_FUNNEL_EVENTS,
     Service.CBTBASE: CBTBASE_FUNNEL_EVENTS,
+    Service.PSYGASTRO: PSYGASTRO_FUNNEL_EVENTS,
 }
 
 FUNNEL_LABELS = {
@@ -152,6 +158,9 @@ SERVICE_CONTENT_EVENT_LABELS = {
     Service.FARMA: FARMA_CONTENT_EVENT_LABELS,
     Service.SFBT: SFBT_CONTENT_EVENT_LABELS,
     Service.CBTBASE: {
+        "advertising_consent": "Дали согласие на рекламу",
+    },
+    Service.PSYGASTRO: {
         "advertising_consent": "Дали согласие на рекламу",
     },
 }

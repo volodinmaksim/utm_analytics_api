@@ -49,6 +49,11 @@ class PaymentEvent(Base):
             "cbtbase_user_id",
             "event_date",
         ),
+        Index(
+            "ix_payment_events_psygastro_user_id_event_date",
+            "psygastro_user_id",
+            "event_date",
+        ),
     )
 
     service: Mapped[ServiceType] = mapped_column(
@@ -99,6 +104,10 @@ class PaymentEvent(Base):
         ForeignKey("cbtbase_users.id"),
         nullable=True,
     )
+    psygastro_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("psygastro_users.id"),
+        nullable=True,
+    )
     matched_user_tg_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     inserted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -117,5 +126,8 @@ class PaymentEvent(Base):
         back_populates="payment_events",
     )
     cbtbase_user: Mapped["CbtbaseUser | None"] = relationship(
+        back_populates="payment_events",
+    )
+    psygastro_user: Mapped["PsygastroUser | None"] = relationship(
         back_populates="payment_events",
     )

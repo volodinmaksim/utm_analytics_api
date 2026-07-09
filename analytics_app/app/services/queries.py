@@ -10,6 +10,8 @@ from analytics_app.app.models import (
     FarmaUser,
     PaymentEvent,
     PaymentEventType,
+    PsygastroEvent,
+    PsygastroUser,
     SfbtEvent,
     SfbtUser,
     TrackedSheet,
@@ -44,6 +46,12 @@ SERVICE_QUERY_CONFIG = {
         "event_model": CbtbaseEvent,
         "payment_user_fk": "cbtbase_user_id",
         "file_event_name": settings.CBTBASE_FILE_EVENT,
+    },
+    Service.PSYGASTRO: {
+        "user_model": PsygastroUser,
+        "event_model": PsygastroEvent,
+        "payment_user_fk": "psygastro_user_id",
+        "file_event_name": settings.PSYGASTRO_FILE_EVENT,
     },
 }
 

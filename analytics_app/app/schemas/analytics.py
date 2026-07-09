@@ -9,6 +9,7 @@ class Service(str, Enum):
     FARMA = "farma"
     SFBT = "sfbt"
     CBTBASE = "cbtbase"
+    PSYGASTRO = "psygastro"
 
 
 class Period(str, Enum):
